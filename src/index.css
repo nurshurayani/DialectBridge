@@ -1,0 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=Cormorant+Garamond:ital,wght@1,500;1,600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Space Grotesk", sans-serif;
+  --font-cultural: "Cormorant Garamond", serif;
+
+  --color-brand-green: #2D6A4F;
+  --color-brand-warm-white: #FAF8F3;
+  --color-brand-off-white: #F4F1EA;
+  --color-accent-sand: #D4A373;
+  --color-accent-brown: #A67C52;
+  --color-soft-green: #E9F5EE;
+  --color-deep-forest: #1B4332;
+  
+  --radius-xl: 1.5rem;
+  --radius-2xl: 2rem;
+}
+
+@layer base {
+  body {
+    @apply bg-brand-warm-white text-deep-forest font-sans;
+  }
+
+  h1, h2, h3, h4 {
+    @apply font-display text-brand-green;
+  }
+}
+
+.pattern-bg {
+  background-color: #2D6A4F;
+  background-image: repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,0.05) 10px, rgba(255,255,255,0.05) 20px);
+}
+
+.woven-border {
+  border: 4px solid transparent;
+  border-image: repeating-linear-gradient(90deg, #2D6A4F 0, #2D6A4F 10px, #D4A373 10px, #D4A373 20px) 1;
+}
+
+.card-shadow {
+  box-shadow: 0 4px 0px rgba(45, 106, 79, 0.1);
+}
+
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(8px);
+}
+
+.motif-border {
+  border-image-source: url('data:image/svg+xml;utf8,<svg width="100" height="100" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg"><path d="M0 50 L25 25 L50 50 L75 75 L100 50" fill="none" stroke="%232D6A4F" stroke-width="2" /></svg>');
+  border-image-slice: 30;
+  border-image-repeat: repeat;
+  border-width: 4px;
+}
+
+.card-pattern {
+  background-image: radial-gradient(#2D6A4F 0.5px, transparent 0.5px);
+  background-size: 10px 10px;
+  background-color: white;
+}
+

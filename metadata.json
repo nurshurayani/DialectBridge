@@ -1,0 +1,8 @@
+{
+  "name": "DialectBridge",
+  "description": "A language learning platform for young Sabahans to reconnect with their ancestral dialects through structured lessons and community contributions.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
