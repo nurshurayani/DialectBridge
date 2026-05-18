@@ -51,6 +51,7 @@ export default function App() {
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [session, setSession] = useState<any>(null);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -58,8 +59,20 @@ export default function App() {
       return;
     }
 
+    // Backup timeout for loading state
+    const timeout = setTimeout(() => {
+      if (loading) setLoading(false);
+    }, 5000);
+
     // Check initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("Auth session error:", error);
+        setAuthError(error.message);
+        setLoading(false);
+        return;
+      }
+      
       setSession(session);
       if (session) {
         fetchUserData(session.user.id);
@@ -85,7 +98,10 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      clearTimeout(timeout);
+    };
   }, []);
 
   async function fetchUserData(userId: string) {
@@ -219,14 +235,20 @@ export default function App() {
   };
 
   if (loading) return (
-    <div className="h-screen w-screen flex items-center justify-center bg-brand-warm-white">
-      <motion.div 
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
-        className="text-brand-green"
-      >
-        <Volume2 size={40} />
-      </motion.div>
+    <div className="h-screen w-screen flex items-center justify-center bg-brand-warm-white p-6 text-center">
+      <div className="flex flex-col items-center gap-6">
+        <motion.div 
+          animate={{ rotate: 360 }}
+          transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
+          className="text-brand-green"
+        >
+          <Volume2 size={60} />
+        </motion.div>
+        <div className="space-y-2">
+          <p className="text-xl font-black text-brand-green uppercase tracking-[0.2em] leading-none">DialectBridge</p>
+          <p className="text-xs font-bold text-deep-forest/40 uppercase tracking-widest animate-pulse">Syncing with Heritage Cloud...</p>
+        </div>
+      </div>
     </div>
   );
 
@@ -234,6 +256,11 @@ export default function App() {
     <div className="min-h-screen bg-brand-warm-white flex flex-col">
       <Toaster position="top-center" />
       
+      {authError && (
+        <div className="bg-red-500 text-white p-2 text-center text-xs font-bold">
+          Auth System Error: {authError}. Check your Supabase configuration.
+        </div>
+      )}
       {/* Top Navigation Bar */}
       {currentScreen !== "lesson" && currentScreen !== "auth" && currentScreen !== "unconfigured" && (
         <nav className="h-16 w-full px-4 md:px-8 flex items-center justify-between border-b border-brand-green/10 bg-white z-40 sticky top-0 shadow-sm">
@@ -465,13 +492,16 @@ function AuthScreen() {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-md bg-white p-12 rounded-[3.5rem] shadow-2xl border border-brand-green/10"
       >
-        <div className="flex flex-col items-center gap-6 mb-12">
-          <div className="w-20 h-20 pattern-bg rounded-[2rem] flex items-center justify-center text-white text-3xl font-black shadow-xl rotate-12">DB</div>
-          <div className="text-center">
-            <h2 className="text-3xl font-black text-brand-green tracking-tight">DialectBridge</h2>
-            <p className="text-deep-forest/40 font-bold italic">Secure your heritage in the cloud.</p>
-          </div>
-        </div>
+        <header className="space-y-3">
+          <h2 className="text-4xl md:text-5xl font-black text-brand-green tracking-tight">
+            {isSignUp ? "Create Descendant Account" : "Return to Roots"}
+          </h2>
+          <p className="text-deep-forest/50 font-medium italic">
+            {isSignUp 
+              ? "Join the bridge and preserve your heritage voice." 
+              : "Welcome back, guardian of dialects."}
+          </p>
+        </header>
 
         <form onSubmit={handleAuth} className="space-y-6">
           <div className="space-y-2">
@@ -479,6 +509,7 @@ function AuthScreen() {
             <input 
               type="email"
               required
+              placeholder="heritage@sabah.com"
               className="w-full bg-brand-warm-white p-5 rounded-3xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold"
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -489,6 +520,7 @@ function AuthScreen() {
             <input 
               type="password"
               required
+              placeholder="••••••••"
               className="w-full bg-brand-warm-white p-5 rounded-3xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold"
               value={password}
               onChange={e => setPassword(e.target.value)}
@@ -498,9 +530,11 @@ function AuthScreen() {
           <button 
             type="submit"
             disabled={loading}
-            className="w-full bg-brand-green text-white py-6 rounded-3xl font-black text-xl shadow-2xl hover:brightness-110 active:scale-95 transition-all mt-4 disabled:opacity-50"
+            className="w-full bg-brand-green text-white py-6 rounded-3xl font-black text-xl shadow-2xl hover:brightness-110 active:scale-95 transition-all mt-4 disabled:opacity-50 flex items-center justify-center gap-3"
           >
-            {loading ? "Syncing..." : (isSignUp ? "Begin Journey" : "Return to Roots")}
+            {loading ? (
+              <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Volume2 size={24} /></motion.div>
+            ) : (isSignUp ? "Begin Journey" : "Enter the Bridge")}
           </button>
         </form>
 
@@ -518,6 +552,7 @@ function AuthScreen() {
 // --- SCREEN COMPONENTS ---
 
 function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void, key?: string }) {
+  if (!user) return <div className="h-full flex items-center justify-center text-brand-green font-bold animate-pulse">Waking the ancestors...</div>;
   const dailyPhrase = LESSONS[0].phrases[0];
 
   return (
@@ -1008,6 +1043,7 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
 }
 
 function ProfileScreen({ user }: { user: any, key?: string }) {
+  if (!user) return <div className="h-full flex items-center justify-center text-brand-green font-bold animate-pulse">Retrieving your scroll...</div>;
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
