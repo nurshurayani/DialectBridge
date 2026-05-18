@@ -35,12 +35,11 @@ import { LESSONS, Lesson } from "./constants";
 import { Toaster, toast } from "react-hot-toast";
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { supabase, isSupabaseConfigured } from "./lib/supabase";
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-
-import { supabase, isSupabaseConfigured } from "./lib/supabase";
 
 type Screen = "auth" | "home" | "explorer" | "lesson" | "community" | "profile" | "unconfigured";
 
@@ -504,6 +503,12 @@ function AuthScreen() {
         </header>
 
         <form onSubmit={handleAuth} className="space-y-6">
+          {isSignUp && (
+            <div className="bg-soft-green p-4 rounded-2xl text-[10px] font-bold text-brand-green/70 flex items-center gap-3">
+              <CheckCircle size={16} />
+              You will need to verify your email before signing in.
+            </div>
+          )}
           <div className="space-y-2">
             <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-2">Ancestral Email</label>
             <input 
@@ -622,14 +627,14 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void, k
             <span className="text-3xl grayscale group-hover:grayscale-0 transition-all animate-bounce">📈</span> Recent Activity
           </h4>
           <div className="flex gap-4 items-end h-32 mb-6">
-            {user.activity.map((entry: any, i: number) => (
+            {user.activity?.map((entry: any, i: number) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar">
                 <div 
                   className={cn(
                     "w-full rounded-2xl transition-all duration-700 ease-out shadow-sm",
-                    entry.count > 15 ? "bg-brand-green shadow-brand-green/20" : entry.count > 0 ? "bg-accent-sand/40 border border-accent-sand/20" : "bg-gray-100/50"
+                    (entry.count || 0) > 15 ? "bg-brand-green shadow-brand-green/20" : (entry.count || 0) > 0 ? "bg-accent-sand/40 border border-accent-sand/20" : "bg-gray-100/50"
                   )}
-                  style={{ height: `${Math.max(entry.count * 3, 10)}%` }}
+                  style={{ height: `${Math.max((entry.count || 0) * 3, 10)}%` }}
                 />
                 <span className="text-[10px] font-black text-deep-forest/30 uppercase tracking-widest">{entry.day}</span>
               </div>
@@ -1089,7 +1094,7 @@ function ProfileScreen({ user }: { user: any, key?: string }) {
           </h3>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={user.activity}>
+              <RechartsBarChart data={user.activity || []}>
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 900, fill: '#1B4332', opacity: 0.3}} />
                 <Tooltip 
                   cursor={{fill: '#2D6A4F05'}}
@@ -1097,8 +1102,8 @@ function ProfileScreen({ user }: { user: any, key?: string }) {
                   itemStyle={{color: 'white'}}
                 />
                 <Bar dataKey="count" radius={[16, 16, 16, 16]} barSize={24}>
-                  {user.activity.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.count > 0 ? '#2D6A4F' : '#F8F9FA'} className="transition-all hover:brightness-125" />
+                  {(user.activity || []).map((entry: any, index: number) => (
+                    <Cell key={`cell-${index}`} fill={(entry.count || 0) > 0 ? '#2D6A4F' : '#F8F9FA'} className="transition-all hover:brightness-125" />
                   ))}
                 </Bar>
               </RechartsBarChart>
@@ -1114,7 +1119,7 @@ function ProfileScreen({ user }: { user: any, key?: string }) {
            </div>
           <h3 className="text-3xl font-black text-deep-forest relative z-10">Sacred Badges</h3>
           <div className="grid grid-cols-2 gap-8 relative z-10">
-            {user.achievements.map((ach: any) => (
+            {(user.achievements || []).map((ach: any) => (
               <div key={ach.id} className="p-8 bg-brand-warm-white rounded-[2.5rem] flex flex-col items-center text-center gap-4 group border border-brand-green/5 hover:border-brand-green/20 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl">
                 <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-brand-green shadow-xl group-hover:scale-125 group-hover:rotate-12 transition-all ring-8 ring-soft-green">
                   {ach.icon === "CheckCircle" && <CheckCircle size={40} strokeWidth={2.5} />}
