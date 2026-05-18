@@ -12,78 +12,9 @@ async function startServer() {
 
   app.use(express.json());
 
-  // Mock database for the session
-  const state = {
-    user: {
-      dialect: "Kadazan",
-      xp: 450,
-      streak: 5,
-      lessonsCompleted: 12,
-      phrasesLearned: 84,
-      activity: [
-        { day: "Mon", count: 12 },
-        { day: "Tue", count: 8 },
-        { day: "Wed", count: 15 },
-        { day: "Thu", count: 20 },
-        { day: "Fri", count: 5 },
-        { day: "Sat", count: 0 },
-        { day: "Sun", count: 0 },
-      ],
-      achievements: [
-        { id: "1", name: "First Lesson", icon: "CheckCircle", description: "Completed your first lesson" },
-        { id: "2", name: "7-Day Streak", icon: "Flame", description: "Practiced for 7 days in a row" },
-      ]
-    },
-    communitySubmissions: [
-      {
-        id: "1",
-        name: "Arthur L.",
-        origin: "Penampang",
-        phrase: "Kopiwosion",
-        meaning: "Greetings / Good day",
-        dialect: "Kadazan",
-        upvotes: 15,
-        note: "Used formally when meeting elders."
-      },
-      {
-        id: "2",
-        name: "Siti A.",
-        origin: "Kota Belud",
-        phrase: "Nokuro ko?",
-        meaning: "Why?",
-        dialect: "Bajau",
-        upvotes: 8,
-        note: "Commonly used in daily conversations."
-      }
-    ]
-  };
-
-  // API Routes
-  app.get("/api/user", (req, res) => {
-    res.json(state.user);
-  });
-
-  app.get("/api/community", (req, res) => {
-    res.json(state.communitySubmissions);
-  });
-
-  app.post("/api/community", (req, res) => {
-    const newSubmission = {
-      id: Date.now().toString(),
-      upvotes: 0,
-      ...req.body
-    };
-    state.communitySubmissions.unshift(newSubmission);
-    res.status(201).json(newSubmission);
-  });
-
-  app.post("/api/user/complete-lesson", (req, res) => {
-    state.user.xp += 50;
-    state.user.lessonsCompleted += 1;
-    state.user.phrasesLearned += 8;
-    // Update activity for "today" (simple mock logic)
-    state.user.activity[6].count += 8;
-    res.json(state.user);
+  // API Routes (Now handled directly via Supabase on client, but kept for future extensions)
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", message: "DialectBridge API is healthy" });
   });
 
   // Gemini API proxy (optional placeholder for real logic)

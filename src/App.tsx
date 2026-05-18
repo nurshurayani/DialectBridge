@@ -40,34 +40,116 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type Screen = "home" | "explorer" | "lesson" | "community" | "profile";
+import { supabase, isSupabaseConfigured } from "./lib/supabase";
+
+type Screen = "auth" | "home" | "explorer" | "lesson" | "community" | "profile" | "unconfigured";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>("home");
+  const [currentScreen, setCurrentScreen] = useState<Screen>(isSupabaseConfigured ? "auth" : "unconfigured");
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [userData, setUserData] = useState<any>(null);
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(isSupabaseConfigured);
+  const [session, setSession] = useState<any>(null);
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const [userRes, communityRes] = await Promise.all([
-          fetch("/api/user"),
-          fetch("/api/community")
-        ]);
-        const user = await userRes.json();
-        const community = await communityRes.json();
-        setUserData(user);
-        setCommunityPosts(community);
-      } catch (error) {
-        console.error("Failed to fetch data:", error);
-      } finally {
+    if (!isSupabaseConfigured) {
+      setLoading(false);
+      return;
+    }
+
+    // Check initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        fetchUserData(session.user.id);
+        fetchCommunityData();
+      } else {
         setLoading(false);
       }
-    }
-    fetchData();
+    }).catch(err => {
+      console.error("Auth check failed:", err);
+      setLoading(false);
+    });
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      if (session) {
+        fetchUserData(session.user.id);
+        setCurrentScreen("home");
+      } else {
+        setUserData(null);
+        setCurrentScreen("auth");
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
+
+  async function fetchUserData(userId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error && error.code === 'PGRST116') {
+        const newProfile = {
+          id: userId,
+          dialect: "Kadazan",
+          xp: 0,
+          streak: 1,
+          phrases_learned: 0,
+          lessons_completed: 0,
+          activity: [
+            { day: "Mon", count: 0 },
+            { day: "Tue", count: 0 },
+            { day: "Wed", count: 0 },
+            { day: "Thu", count: 0 },
+            { day: "Fri", count: 0 },
+            { day: "Sat", count: 0 },
+            { day: "Sun", count: 0 },
+          ],
+          achievements: [
+            { id: "1", name: "First Steps", icon: "CheckCircle", description: "Joined the bridge" }
+          ]
+        };
+        const { data: created, error: createError } = await supabase
+          .from('profiles')
+          .insert([newProfile])
+          .select()
+          .single();
+        
+        if (createError) throw createError;
+        setUserData(created);
+      } else if (error) {
+        throw error;
+      } else {
+        setUserData(data);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function fetchCommunityData() {
+    try {
+      const { data, error } = await supabase
+        .from('community_posts')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setCommunityPosts(data || []);
+    } catch (error) {
+      console.error("Failed to fetch community data:", error);
+    }
+  }
 
   const handleStartLesson = (lesson: Lesson) => {
     if (lesson.phrases.length === 0) {
@@ -79,14 +161,60 @@ export default function App() {
   };
 
   const handleLessonComplete = async () => {
+    if (!userData || !session) return;
+    
     try {
-      const res = await fetch("/api/user/complete-lesson", { method: "POST" });
-      const updatedUser = await res.json();
-      setUserData(updatedUser);
-      toast.success("Lesson Complete! +50 XP");
+      const updatedXp = (userData.xp || 0) + 50;
+      const updatedLessons = (userData.lessons_completed || 0) + 1;
+      const updatedPhrases = (userData.phrases_learned || 0) + 8;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({ 
+          xp: updatedXp, 
+          lessons_completed: updatedLessons, 
+          phrases_learned: updatedPhrases 
+        })
+        .eq('id', session.user.id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      setUserData(data);
+      toast.success("Progress Saved to Supabase! +50 XP");
       setCurrentScreen("home");
     } catch (error) {
-      toast.error("Failed to save progress");
+      toast.error("Failed to save progress to cloud");
+    }
+  };
+
+  const handleNewPost = async (postData: any) => {
+    if (!session) return;
+    
+    try {
+      const newPost = {
+        phrase: postData.phrase,
+        meaning: postData.meaning,
+        dialect: postData.dialect,
+        origin: postData.origin,
+        note: postData.note,
+        user_id: session.user.id,
+        name: session.user.email?.split('@')[0] || "Sabahan Spirit",
+        upvotes: 0
+      };
+
+      const { data, error } = await supabase
+        .from('community_posts')
+        .insert([newPost])
+        .select()
+        .single();
+
+      if (error) throw error;
+      setCommunityPosts([data, ...communityPosts]);
+      toast.success("Phrase preserved in the community cloud!");
+    } catch (error) {
+      console.error("Submission error:", error);
+      toast.error("Failed to share phrase");
     }
   };
 
@@ -94,7 +222,7 @@ export default function App() {
     <div className="h-screen w-screen flex items-center justify-center bg-brand-warm-white">
       <motion.div 
         animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
+        transition={{ repeat: Infinity, duration: 1.5, ease: "linear" }}
         className="text-brand-green"
       >
         <Volume2 size={40} />
@@ -107,7 +235,7 @@ export default function App() {
       <Toaster position="top-center" />
       
       {/* Top Navigation Bar */}
-      {currentScreen !== "lesson" && (
+      {currentScreen !== "lesson" && currentScreen !== "auth" && currentScreen !== "unconfigured" && (
         <nav className="h-16 w-full px-4 md:px-8 flex items-center justify-between border-b border-brand-green/10 bg-white z-40 sticky top-0 shadow-sm">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full pattern-bg flex items-center justify-center text-white font-bold">DB</div>
@@ -133,7 +261,7 @@ export default function App() {
 
       <div className="flex-1 flex overflow-hidden relative">
         {/* Sidebar Navigation (Desktop) */}
-        {currentScreen !== "lesson" && (
+        {currentScreen !== "lesson" && currentScreen !== "auth" && currentScreen !== "unconfigured" && (
           <aside className="w-64 border-r border-brand-green/10 hidden md:flex flex-col py-8 px-4 bg-white/50 overflow-y-auto">
             <div className="space-y-2 mb-8">
               <SidebarLink 
@@ -173,7 +301,7 @@ export default function App() {
         )}
 
         {/* Bottom Navigation (Mobile) */}
-        {currentScreen !== "lesson" && (
+        {currentScreen !== "lesson" && currentScreen !== "auth" && currentScreen !== "unconfigured" && (
           <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-brand-green/10 flex justify-around items-center md:hidden z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.03)]">
             <NavButton icon={<Home />} active={currentScreen === "home"} onClick={() => setCurrentScreen("home")} />
             <NavButton icon={<Library />} active={currentScreen === "explorer"} onClick={() => setCurrentScreen("explorer")} />
@@ -191,6 +319,12 @@ export default function App() {
             currentScreen === "lesson" ? "" : "max-w-5xl"
           )}>
             <AnimatePresence mode="wait">
+              {currentScreen === "unconfigured" && (
+                <UnconfiguredScreen key="unconfigured" />
+              )}
+              {currentScreen === "auth" && (
+                <AuthScreen key="auth" />
+              )}
               {currentScreen === "home" && (
                 <HomeScreen 
                   key="home" 
@@ -208,7 +342,7 @@ export default function App() {
                 <CommunityScreen 
                   key="community" 
                   posts={communityPosts} 
-                  onNewPost={(post) => setCommunityPosts([post, ...communityPosts])}
+                  onNewPost={handleNewPost}
                 />
               )}
               {currentScreen === "profile" && (
@@ -231,7 +365,7 @@ export default function App() {
       </div>
 
       {/* Decorative Bottom Line (Global) */}
-      {currentScreen !== "lesson" && (
+      {currentScreen !== "lesson" && currentScreen !== "unconfigured" && (
         <div className="h-2 w-full woven-border opacity-20 sticky bottom-0"></div>
       )}
     </div>
@@ -265,6 +399,119 @@ function NavButton({ icon, active, onClick }: { icon: React.ReactNode, active: b
     >
       {icon}
     </button>
+  );
+}
+
+function UnconfiguredScreen() {
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-brand-warm-white">
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        className="w-full max-w-lg bg-white p-12 rounded-[3.5rem] shadow-2xl border-4 border-accent-sand/20 text-center space-y-8"
+      >
+        <div className="w-24 h-24 bg-accent-sand/10 rounded-[2.5rem] flex items-center justify-center text-accent-brown mx-auto shadow-inner">
+          <Library size={48} />
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-4xl font-black text-brand-green tracking-tight leading-none">Database Setup Required</h2>
+          <p className="text-deep-forest/60 font-bold italic text-lg">"The bridge cannot hold without its foundation."</p>
+        </div>
+        <div className="bg-soft-green/50 p-8 rounded-[2rem] border border-brand-green/10 text-left space-y-4">
+          <p className="font-bold text-brand-green">To enable cloud synchronization and community features, update your project settings:</p>
+          <ol className="list-decimal list-inside text-sm font-bold text-deep-forest/70 space-y-2">
+            <li>Go to <span className="text-brand-green">Settings</span> in AI Studio</li>
+            <li>Add <code className="bg-white px-2 py-1 rounded">VITE_SUPABASE_URL</code></li>
+            <li>Add <code className="bg-white px-2 py-1 rounded">VITE_SUPABASE_ANON_KEY</code></li>
+            <li>Refresh the application</li>
+          </ol>
+        </div>
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Connect to Supabase to save your heritage progress.</p>
+      </motion.div>
+    </div>
+  );
+}
+
+function AuthScreen() {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [isSignUp, setIsSignUp] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (isSignUp) {
+        const { error } = await supabase.auth.signUp({ email, password });
+        if (error) throw error;
+        toast.success("Welcome! Check your email for verification.");
+      } else {
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+        toast.success("Welcome back, seeker.");
+      }
+    } catch (error: any) {
+      toast.error(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex items-center justify-center p-6 bg-brand-warm-white">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="w-full max-w-md bg-white p-12 rounded-[3.5rem] shadow-2xl border border-brand-green/10"
+      >
+        <div className="flex flex-col items-center gap-6 mb-12">
+          <div className="w-20 h-20 pattern-bg rounded-[2rem] flex items-center justify-center text-white text-3xl font-black shadow-xl rotate-12">DB</div>
+          <div className="text-center">
+            <h2 className="text-3xl font-black text-brand-green tracking-tight">DialectBridge</h2>
+            <p className="text-deep-forest/40 font-bold italic">Secure your heritage in the cloud.</p>
+          </div>
+        </div>
+
+        <form onSubmit={handleAuth} className="space-y-6">
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-2">Ancestral Email</label>
+            <input 
+              type="email"
+              required
+              className="w-full bg-brand-warm-white p-5 rounded-3xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-2">Secret Password</label>
+            <input 
+              type="password"
+              required
+              className="w-full bg-brand-warm-white p-5 rounded-3xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+            />
+          </div>
+
+          <button 
+            type="submit"
+            disabled={loading}
+            className="w-full bg-brand-green text-white py-6 rounded-3xl font-black text-xl shadow-2xl hover:brightness-110 active:scale-95 transition-all mt-4 disabled:opacity-50"
+          >
+            {loading ? "Syncing..." : (isSignUp ? "Begin Journey" : "Return to Roots")}
+          </button>
+        </form>
+
+        <button 
+          onClick={() => setIsSignUp(!isSignUp)}
+          className="w-full mt-8 text-brand-green font-black text-sm hover:underline tracking-tight"
+        >
+          {isSignUp ? "Already a guardian? Sign In" : "New descendant? Create Account"}
+        </button>
+      </motion.div>
+    </div>
   );
 }
 
@@ -785,6 +1032,12 @@ function ProfileScreen({ user }: { user: any, key?: string }) {
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
               <Trophy size={22} className="text-accent-sand" /> {user.xp} XP Points
             </span>
+            <button 
+              onClick={() => supabase.auth.signOut()}
+              className="bg-red-50 px-8 py-3 rounded-2xl text-sm font-black text-red-600 flex items-center gap-3 shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </header>
