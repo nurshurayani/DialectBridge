@@ -176,12 +176,17 @@ export default function App() {
   };
 
   const handleLessonComplete = async () => {
-    if (!userData || !session) return;
+    if (!userData || !session) {
+      toast.success("Progress Reclaimed! +50 XP");
+      setCurrentScreen("explorer");
+      return;
+    }
     
     try {
+      setLoading(true);
       const updatedXp = (userData.xp || 0) + 50;
       const updatedLessons = (userData.lessons_completed || 0) + 1;
-      const updatedPhrases = (userData.phrases_learned || 0) + 8;
+      const updatedPhrases = (userData.phrases_learned || (userData.phrases_learned === 0 ? 0 : 0)) + 8;
       
       const { data, error } = await supabase
         .from('profiles')
@@ -196,10 +201,14 @@ export default function App() {
 
       if (error) throw error;
       setUserData(data);
-      toast.success("Progress Saved to Supabase! +50 XP");
-      setCurrentScreen("home");
+      toast.success("Progress Saved to Heritage Cloud! +50 XP");
+      setCurrentScreen("explorer");
     } catch (error) {
-      toast.error("Failed to save progress to cloud");
+      console.error("Save error:", error);
+      toast.error("Failed to save progress, but wisdom is yours.");
+      setCurrentScreen("explorer");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -743,7 +752,7 @@ function ExplorerScreen({ onStartLesson }: { onStartLesson: (lesson: Lesson) => 
 
 function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComplete: () => void, onExit: () => void, key?: string }) {
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [isFlipped, setIsFlipped] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
 
   const currentPhrase = lesson.phrases[currentIndex];
@@ -768,7 +777,7 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   const next = () => {
     if (currentIndex < lesson.phrases.length - 1) {
       setCurrentIndex(currentIndex + 1);
-      setIsFlipped(false);
+      setIsRevealed(false);
       setSelectedOption(null);
     } else {
       onComplete();
@@ -792,43 +801,66 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
         <span className="text-sm font-black text-brand-green uppercase tracking-[0.2em] hidden sm:block">Calibration {currentIndex + 1}/{lesson.phrases.length}</span>
       </header>
 
-      <div className="flex-1 overflow-y-auto p-6 md:p-14 space-y-16 max-w-4xl mx-auto w-full">
-        {/* Flip Card */}
-        <div 
-          className="relative h-96 md:h-[450px] w-full cursor-pointer perspective-2000 group active:scale-95 transition-transform"
-          onClick={() => setIsFlipped(!isFlipped)}
-        >
-          <motion.div 
-            animate={{ rotateY: isFlipped ? 180 : 0 }}
-            transition={{ duration: 0.8, type: "spring", stiffness: 100, damping: 15 }}
-            className="w-full h-full relative preserve-3d"
-          >
-            {/* Front */}
-            <div className="absolute inset-0 bg-white shadow-[0_30px_60px_-15px_rgba(45,106,79,0.15)] rounded-[4rem] p-16 flex flex-col items-center justify-center border-4 border-accent-sand/10 backface-hidden motif-border transition-all group-hover:border-brand-green/20">
-              <span className="absolute top-10 text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Dialect Phrase</span>
-              <h3 className="text-6xl md:text-8xl font-black text-brand-green text-center leading-none tracking-tighter">{currentPhrase.phrase}</h3>
-              <p className="mt-12 text-accent-sand font-black uppercase tracking-[0.4em] text-xs transition-all opacity-40 group-hover:opacity-100 group-hover:scale-110">Click to reveal meaning</p>
-            </div>
+      <div className="flex-1 overflow-y-auto p-6 md:p-14 space-y-8 max-w-4xl mx-auto w-full pb-32">
+        {/* Modern Revelation Card */}
+        <div className="bg-white rounded-[3.5rem] shadow-2xl border-2 border-brand-green/5 overflow-hidden transition-all duration-500">
+          <div className="p-12 md:p-16 flex flex-col items-center justify-center text-center space-y-6">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Dialect Phrase</span>
+            <h3 className="text-6xl md:text-8xl font-black text-brand-green leading-none tracking-tighter">{currentPhrase.phrase}</h3>
+            
+            <button 
+              onClick={() => setIsRevealed(!isRevealed)}
+              className={cn(
+                "px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-3",
+                isRevealed ? "bg-soft-green text-brand-green" : "bg-brand-green text-white shadow-xl"
+              )}
+            >
+              {isRevealed ? <CheckCircle size={20} /> : <PlayCircle size={20} />}
+              {isRevealed ? "Heritage Revealed" : "Reveal Ancestral Meaning"}
+            </button>
+          </div>
 
-            {/* Back */}
-            <div className="absolute inset-0 bg-brand-green text-white shadow-2xl rounded-[4rem] p-12 flex flex-col items-center justify-center border-8 border-accent-sand/30 rotate-y-180 backface-hidden relative overflow-hidden">
-              <div className="absolute inset-0 pattern-bg opacity-15"></div>
-              <div className="space-y-10 text-center relative z-10 w-full">
-                <p className="text-white font-mono text-3xl tracking-[0.2em] bg-white/10 py-4 rounded-3xl backdrop-blur-md border border-white/5 whitespace-nowrap overflow-hidden text-ellipsis px-4 capitalize">/{currentPhrase.pronunciation}/</p>
-                <div className="space-y-4">
-                  <p className="text-5xl font-black tracking-tight">{currentPhrase.meaningBM}</p>
-                  <div className="h-1 w-20 bg-accent-sand mx-auto rounded-full"></div>
-                  <p className="text-2xl text-white/70 italic font-cultural whitespace-nowrap overflow-hidden text-ellipsis px-4 underline decoration-accent-sand/50 underline-offset-8">"{currentPhrase.meaningEN}"</p>
+          <AnimatePresence>
+            {isRevealed && (
+              <motion.div 
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-hidden bg-brand-green text-white"
+              >
+                <div className="p-12 md:p-16 space-y-10 relative">
+                  <div className="absolute inset-0 pattern-bg opacity-10"></div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
+                    <div className="space-y-6">
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Pronunciation</p>
+                        <p className="text-3xl font-mono tracking-wider italic">/{currentPhrase.pronunciation}/</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Bahasa Malaysia</p>
+                        <p className="text-4xl font-black uppercase">{currentPhrase.meaningBM}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">English</p>
+                        <p className="text-3xl font-black opacity-80 decoration-accent-sand decoration-2 underline underline-offset-4 tracking-tight">"{currentPhrase.meaningEN}"</p>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/10 p-8 rounded-[2.5rem] border border-white/10 backdrop-blur-md space-y-4">
+                      <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Cultural Note</p>
+                      <p className="text-lg font-medium leading-relaxed italic font-cultural">
+                        {currentPhrase.note}
+                      </p>
+                      <button className="flex items-center gap-2 bg-white text-brand-green px-5 py-3 rounded-xl font-black text-sm hover:scale-105 transition-all">
+                        <Volume2 size={18} /> Play Audio
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <div className="bg-white/10 p-8 rounded-[2.5rem] text-lg italic font-cultural border border-white/5 backdrop-blur-xl shadow-inner">
-                   {currentPhrase.note}
-                </div>
-                <button className="mx-auto w-20 h-20 bg-white text-brand-green rounded-[2rem] flex items-center justify-center hover:scale-110 transition-all shadow-2xl hover:rotate-12 border-4 border-soft-green">
-                  <Volume2 size={32} />
-                </button>
-              </div>
-            </div>
-          </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
 
         {/* Quiz Section */}
@@ -854,7 +886,7 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
         </section>
 
         {/* Navigation */}
-        <div className="flex justify-between items-center pt-10 pb-20">
+        <div className="flex justify-between items-center pt-10">
           <button 
             disabled={currentIndex === 0}
             onClick={() => setCurrentIndex(currentIndex - 1)}
@@ -863,7 +895,11 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
             ← Back
           </button>
           <button 
-            onClick={next}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              next();
+            }}
             className="px-16 py-6 bg-deep-forest text-white rounded-full font-black text-2xl shadow-[0_20px_50px_rgba(27,67,50,0.4)] hover:brightness-125 transition-all transform active:scale-90 hover:scale-105"
           >
             {currentIndex === lesson.phrases.length - 1 ? "Reclaim Heritage →" : "Proceed →"}
