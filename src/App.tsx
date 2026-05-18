@@ -761,18 +761,23 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   
   const options = React.useMemo(() => {
     let correctText = "";
-    let distractors: string[] = [];
+    let pool: string[] = [];
 
-    if (quizType === "kto_bm") {
-      correctText = currentPhrase.meaningBM;
-      distractors = ["Selamat malam", "Saya lapar", "Tolong saya"];
-    } else if (quizType === "kto_en") {
-      correctText = currentPhrase.meaningEN;
-      distractors = ["Good night", "I am hungry", "Help me"];
-    } else {
-      correctText = currentPhrase.phrase;
-      distractors = ["Kounsapaan", "Nunu habar", "Kopivosian"];
+    // Verified Kadazan distractor pool from dictionary
+    const kadazanPool = ["Oitom", "Obulou", "Aragang", "Osilou", "Opurak", "Otomou", "Iso", "Duo", "Tolu", "Apat", "Limo", "Onom", "Turu", "Walu", "Siam", "Hopod", "Ourod", "Miagal", "Tulu", "Turos", "Longon", "Palad", "Lukap", "Tunduundu'"];
+    const bmPool = ["Hitam", "Biru", "Merah", "Kuning", "Putih", "Hijau", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Lapan", "Sembilan", "Sepuluh", "Bulatan", "Segi Empat", "Kepala", "Muka", "Lengan", "Tapak Tangan", "Kaki", "Jantung"];
+    const enPool = ["Black", "Blue", "Red", "Yellow", "White", "Green", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Circle", "Square", "Head", "Face", "Arm", "Palm", "Foot", "Heart"];
+
+    if (quizType === "kto_bm" || quizType === "ento_k") {
+      correctText = quizType === "kto_bm" ? currentPhrase.meaningBM : currentPhrase.phrase;
+      pool = quizType === "kto_bm" ? bmPool : kadazanPool;
+    } else if (quizType === "kto_en" || quizType === "bmto_k") {
+      correctText = quizType === "kto_en" ? currentPhrase.meaningEN : currentPhrase.phrase;
+      pool = quizType === "kto_en" ? enPool : kadazanPool;
     }
+
+    const filteredPool = pool.filter(t => t !== correctText);
+    const distractors = filteredPool.sort(() => Math.random() - 0.5).slice(0, 3);
 
     return [
       { text: correctText, correct: true },
