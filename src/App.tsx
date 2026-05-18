@@ -764,9 +764,9 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
     let pool: string[] = [];
 
     // Verified Kadazan distractor pool from dictionary
-    const kadazanPool = ["Oitom", "Obulou", "Aragang", "Osilou", "Opurak", "Otomou", "Iso", "Duo", "Tolu", "Apat", "Limo", "Onom", "Turu", "Walu", "Siam", "Hopod", "Ourod", "Miagal", "Tulu", "Turos", "Longon", "Palad", "Lukap", "Tunduundu'"];
-    const bmPool = ["Hitam", "Biru", "Merah", "Kuning", "Putih", "Hijau", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Lapan", "Sembilan", "Sepuluh", "Bulatan", "Segi Empat", "Kepala", "Muka", "Lengan", "Tapak Tangan", "Kaki", "Jantung"];
-    const enPool = ["Black", "Blue", "Red", "Yellow", "White", "Green", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Circle", "Square", "Head", "Face", "Arm", "Palm", "Foot", "Heart"];
+    const kadazanPool = ["Oitom", "Obulou", "Aragang", "Osilou", "Opurak", "Otomou", "Iso", "Duo", "Tolu", "Apat", "Limo", "Onom", "Turu", "Walu", "Siam", "Hopod", "Ourod", "Miagal", "Tulu", "Turos", "Longon", "Palad", "Lukap", "Tunduundu'", "Milatok", "Mansak", "Gomot", "Ngiop", "Mikat", "Mahas", "Tontolu'", "Tiwang", "Kosuabon", "Pitangadaau", "Sosodopon", "Minsosodop", "Pitanga sodop", "Mongingia'", "Dokutul", "Noos", "Momuumutanom", "Monginginsada'", "Dolibor", "Pailot", "Tukang kayu"];
+    const bmPool = ["Hitam", "Biru", "Merah", "Kuning", "Putih", "Hijau", "Satu", "Dua", "Tiga", "Empat", "Lima", "Enam", "Tujuh", "Lapan", "Sembilan", "Sepuluh", "Bulatan", "Segi Empat", "Kepala", "Muka", "Lengan", "Tapak Tangan", "Kaki", "Jantung", "Januari", "Februari", "Mac", "April", "Mei", "Jun", "Isnin", "Ahad", "Pagi", "Tengah Hari", "Petang", "Senja/Malam", "Tengah Malam", "Guru", "Doktor", "Jururawat", "Petani", "Nelayan", "Pemandu", "Juruterbang", "Tukang Kayu"];
+    const enPool = ["Black", "Blue", "Red", "Yellow", "White", "Green", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Circle", "Square", "Head", "Face", "Arm", "Palm", "Foot", "Heart", "January", "February", "March", "April", "May", "June", "Monday", "Sunday", "Morning", "Noon", "Afternoon", "Evening", "Midnight", "Teacher", "Doctor", "Nurse", "Farmer", "Fisherman", "Driver", "Pilot", "Carpenter"];
 
     if (quizType === "kto_bm" || quizType === "ento_k") {
       correctText = quizType === "kto_bm" ? currentPhrase.meaningBM : currentPhrase.phrase;

@@ -114,4 +114,58 @@ export const LESSONS: Lesson[] = [
       { id: "b6", phrase: "Tunduundu'", pronunciation: "Toon-doon-doo", meaningBM: "Jantung/Hati", meaningEN: "Heart", note: "The rhythm of life." },
     ]
   },
+  {
+    id: "l6",
+    title: "Sacred Seasons",
+    icon: "Calendar",
+    phrasesCount: 12,
+    progress: 0,
+    isCompleted: false,
+    category: "Calendar",
+    phrases: [
+      { id: "m1", phrase: "Milatok", pronunciation: "Mee-la-tok", meaningBM: "Januari", meaningEN: "January", note: "The beginning of the cycle." },
+      { id: "m2", phrase: "Mansak", pronunciation: "Man-sak", meaningBM: "Februari", meaningEN: "February", note: "Month of growth." },
+      { id: "m3", phrase: "Gomot", pronunciation: "Go-mot", meaningBM: "Mac", meaningEN: "March", note: "Transition season." },
+      { id: "m4", phrase: "Ngiop", pronunciation: "Ngee-op", meaningBM: "April", meaningEN: "April", note: "The spirit of the rains." },
+      { id: "m5", phrase: "Mikat", pronunciation: "Mee-kat", meaningBM: "Mei", meaningEN: "May", note: "The harvest begins." },
+      { id: "m6", phrase: "Mahas", pronunciation: "Ma-has", meaningBM: "Jun", meaningEN: "June", note: "The center of the year." },
+      { id: "d1", phrase: "Tontolu'", pronunciation: "Ton-to-loo", meaningBM: "Isnin", meaningEN: "Monday", note: "Moon's day." },
+      { id: "d7", phrase: "Tiwang", pronunciation: "Tee-wang", meaningBM: "Ahad", meaningEN: "Sunday", note: "Rest and reflection." },
+    ]
+  },
+  {
+    id: "l7",
+    title: "Rhythms of the Sun",
+    icon: "Clock",
+    phrasesCount: 5,
+    progress: 0,
+    isCompleted: false,
+    category: "Time",
+    phrases: [
+      { id: "t1", phrase: "Kosuabon", pronunciation: "Ko-sua-bon", meaningBM: "Pagi", meaningEN: "Morning", note: "When the sun first greets us." },
+      { id: "t2", phrase: "Pitangadaau", pronunciation: "Pee-ta-nga-da-ow", meaningBM: "Tengah Hari", meaningEN: "Noon", note: "The sun at its peak." },
+      { id: "t3", phrase: "Sosodopon", pronunciation: "So-so-do-pon", meaningBM: "Petang", meaningEN: "Afternoon", note: "As shadows lengthen." },
+      { id: "t4", phrase: "Minsosodop", pronunciation: "Min-so-so-dop", meaningBM: "Senja/Malam", meaningEN: "Evening", note: "Nature winding down." },
+      { id: "t5", phrase: "Pitanga sodop", pronunciation: "Pee-ta-nga so-dop", meaningBM: "Tengah Malam", meaningEN: "Midnight", note: "The deepest silence." },
+    ]
+  },
+  {
+    id: "l8",
+    title: "Pathways of Service",
+    icon: "Briefcase",
+    phrasesCount: 8,
+    progress: 0,
+    isCompleted: false,
+    category: "Occupations",
+    phrases: [
+      { id: "o1", phrase: "Mongingia'", pronunciation: "Mo-ngi-ngee-a", meaningBM: "Guru", meaningEN: "Teacher", note: "Giver of knowledge." },
+      { id: "o2", phrase: "Dokutul", pronunciation: "Do-koo-tool", meaningBM: "Doktor", meaningEN: "Doctor", note: "Healer of the soul and body." },
+      { id: "o3", phrase: "Noos", pronunciation: "No-os", meaningBM: "Jururawat", meaningEN: "Nurse", note: "Protector of the weak." },
+      { id: "o4", phrase: "Momuumutanom", pronunciation: "Mo-moo-moo-ta-nom", meaningBM: "Petani", meaningEN: "Farmer", note: "Guardian of the earth." },
+      { id: "o5", phrase: "Monginginsada'", pronunciation: "Mo-ngi-ngin-sa-da", meaningBM: "Nelayan", meaningEN: "Fisherman", note: "Harvester of the sea." },
+      { id: "o6", phrase: "Dolibor", pronunciation: "Do-lee-bor", meaningBM: "Pemandu", meaningEN: "Driver", note: "One who guides the path." },
+      { id: "o7", phrase: "Pailot", pronunciation: "Pie-lot", meaningBM: "Juruterbang", meaningEN: "Pilot", note: "Voyager of the skies." },
+      { id: "o8", phrase: "Tukang kayu", pronunciation: "Too-kang ka-yoo", meaningBM: "Tukang Kayu", meaningEN: "Carpenter", note: "Shaper of the wood." },
+    ]
+  },
 ];
