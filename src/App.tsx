@@ -754,35 +754,84 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [mode, setMode] = useState<"learning" | "quiz">("learning");
+  const [quizType, setQuizType] = useState<"kto_bm" | "kto_en" | "bmto_k" | "ento_k">("kto_bm");
 
   const currentPhrase = lesson.phrases[currentIndex];
   
-  const options = React.useMemo(() => [
-    { text: currentPhrase.meaningBM, correct: true },
-    { text: "Selamat malam", correct: false },
-    { text: "Saya lapur", correct: false },
-    { text: "Tolong saya", correct: false }
-  ].sort(() => Math.random() - 0.5), [currentIndex, currentPhrase]);
+  const options = React.useMemo(() => {
+    let correctText = "";
+    let distractors: string[] = [];
+
+    if (quizType === "kto_bm") {
+      correctText = currentPhrase.meaningBM;
+      distractors = ["Selamat malam", "Saya lapar", "Tolong saya"];
+    } else if (quizType === "kto_en") {
+      correctText = currentPhrase.meaningEN;
+      distractors = ["Good night", "I am hungry", "Help me"];
+    } else {
+      correctText = currentPhrase.phrase;
+      distractors = ["Kounsapaan", "Nunu habar", "Kopivosian"];
+    }
+
+    return [
+      { text: correctText, correct: true },
+      ...distractors.map(text => ({ text, correct: false }))
+    ].sort(() => Math.random() - 0.5);
+  }, [currentIndex, currentPhrase, mode, quizType]);
 
   const handleOptionClick = (option: { text: string, correct: boolean }) => {
     if (selectedOption) return;
     setSelectedOption(option.text);
     if (option.correct) {
-      toast.success("Tepat sekali! Perfect pronunciation.");
+      toast.success("Tepat sekali! Your ancestors are proud.");
     } else {
-      toast.error("Almost there. Try again, soul.");
+      toast.error("Almost there. The bridge falters.");
     }
   };
 
   const next = () => {
-    if (currentIndex < lesson.phrases.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setIsRevealed(false);
-      setSelectedOption(null);
+    if (mode === "learning") {
+      if (currentIndex < lesson.phrases.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+        setIsRevealed(false);
+      } else {
+        setMode("quiz");
+        setCurrentIndex(0);
+        setSelectedOption(null);
+        setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
+      }
     } else {
-      onComplete();
+      if (currentIndex < lesson.phrases.length - 1) {
+        setCurrentIndex(currentIndex + 1);
+        setSelectedOption(null);
+        setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
+      } else {
+        onComplete();
+      }
     }
   };
+
+  const back = () => {
+    if (mode === "quiz") {
+      if (currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+        setSelectedOption(null);
+      } else {
+        setMode("learning");
+        setCurrentIndex(lesson.phrases.length - 1);
+        setIsRevealed(true);
+      }
+    } else {
+      if (currentIndex > 0) {
+        setCurrentIndex(currentIndex - 1);
+        setIsRevealed(false);
+      }
+    }
+  };
+
+  const totalSteps = lesson.phrases.length * 2;
+  const currentStep = mode === "learning" ? currentIndex + 1 : lesson.phrases.length + currentIndex + 1;
 
   return (
     <div className="fixed inset-0 bg-brand-warm-white z-50 flex flex-col">
@@ -793,103 +842,139 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
         <div className="flex-1 max-w-xl mx-10">
           <div className="h-4 bg-brand-warm-white rounded-full overflow-hidden border-2 border-brand-green/5 p-[2px] shadow-inner">
             <motion.div 
-              animate={{ width: `${((currentIndex + 1) / lesson.phrases.length) * 100}%` }}
+              animate={{ width: `${(currentStep / totalSteps) * 100}%` }}
               className="h-full bg-brand-green rounded-full shadow-[0_0_15px_rgba(45,106,79,0.4)]"
             />
           </div>
         </div>
-        <span className="text-sm font-black text-brand-green uppercase tracking-[0.2em] hidden sm:block">Calibration {currentIndex + 1}/{lesson.phrases.length}</span>
+        <span className="text-sm font-black text-brand-green uppercase tracking-[0.2em] hidden sm:block">
+          {mode === "learning" ? "Learning" : "Quiz"} {currentIndex + 1}/{lesson.phrases.length}
+        </span>
       </header>
 
       <div className="flex-1 overflow-y-auto p-6 md:p-14 space-y-8 max-w-4xl mx-auto w-full pb-32">
-        {/* Modern Revelation Card */}
-        <div className="bg-white rounded-[3.5rem] shadow-2xl border-2 border-brand-green/5 overflow-hidden transition-all duration-500">
-          <div className="p-12 md:p-16 flex flex-col items-center justify-center text-center space-y-6">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Dialect Phrase</span>
-            <h3 className="text-6xl md:text-8xl font-black text-brand-green leading-none tracking-tighter">{currentPhrase.phrase}</h3>
-            
-            <button 
-              onClick={() => setIsRevealed(!isRevealed)}
-              className={cn(
-                "px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-3",
-                isRevealed ? "bg-soft-green text-brand-green" : "bg-brand-green text-white shadow-xl"
-              )}
-            >
-              {isRevealed ? <CheckCircle size={20} /> : <PlayCircle size={20} />}
-              {isRevealed ? "Heritage Revealed" : "Reveal Ancestral Meaning"}
-            </button>
-          </div>
-
-          <AnimatePresence>
-            {isRevealed && (
-              <motion.div 
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                className="overflow-hidden bg-brand-green text-white"
-              >
-                <div className="p-12 md:p-16 space-y-10 relative">
-                  <div className="absolute inset-0 pattern-bg opacity-10"></div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
-                    <div className="space-y-6">
-                      <div className="space-y-1">
-                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Pronunciation</p>
-                        <p className="text-3xl font-mono tracking-wider italic">/{currentPhrase.pronunciation}/</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Bahasa Malaysia</p>
-                        <p className="text-4xl font-black uppercase">{currentPhrase.meaningBM}</p>
-                      </div>
-                      <div className="space-y-1">
-                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">English</p>
-                        <p className="text-3xl font-black opacity-80 decoration-accent-sand decoration-2 underline underline-offset-4 tracking-tight">"{currentPhrase.meaningEN}"</p>
-                      </div>
-                    </div>
-
-                    <div className="bg-white/10 p-8 rounded-[2.5rem] border border-white/10 backdrop-blur-md space-y-4">
-                      <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Cultural Note</p>
-                      <p className="text-lg font-medium leading-relaxed italic font-cultural">
-                        {currentPhrase.note}
-                      </p>
-                      <button className="flex items-center gap-2 bg-white text-brand-green px-5 py-3 rounded-xl font-black text-sm hover:scale-105 transition-all">
-                        <Volume2 size={18} /> Play Audio
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Quiz Section */}
-        <section className="space-y-10 bg-white p-12 rounded-[4rem] border-2 border-brand-green/10 shadow-2xl card-shadow">
-          <h4 className="font-black text-center text-deep-forest/30 uppercase text-xs tracking-[0.3em] mb-4">Choose the ancestral meaning</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {options.map((opt) => (
-              <button
-                key={opt.text}
-                disabled={selectedOption !== null}
-                onClick={() => handleOptionClick(opt)}
+        {mode === "learning" ? (
+          <motion.div 
+            key={`learning-${currentIndex}`}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            className="bg-white rounded-[3.5rem] shadow-2xl border-2 border-brand-green/5 overflow-hidden transition-all duration-500"
+          >
+            <div className="p-12 md:p-16 flex flex-col items-center justify-center text-center space-y-6">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Dialect Phrase</span>
+              <h3 className="text-6xl md:text-8xl font-black text-brand-green leading-none tracking-tighter">{currentPhrase.phrase}</h3>
+              
+              <button 
+                onClick={() => setIsRevealed(!isRevealed)}
                 className={cn(
-                  "p-6 rounded-[2rem] border-4 text-left transition-all font-black text-xl md:text-2xl shadow-sm",
-                  selectedOption === opt.text
-                    ? (opt.correct ? "bg-green-600 border-green-800 text-white shadow-2xl scale-[1.03] -translate-y-1" : "bg-red-500 border-red-700 text-white opacity-90")
-                    : "bg-brand-warm-white border-transparent hover:border-accent-sand/30 text-deep-forest hover:bg-soft-green hover:scale-[1.01]"
+                  "px-8 py-4 rounded-2xl font-black transition-all flex items-center gap-3",
+                  isRevealed ? "bg-soft-green text-brand-green" : "bg-brand-green text-white shadow-xl"
                 )}
               >
-                {opt.text}
+                {isRevealed ? <CheckCircle size={20} /> : <PlayCircle size={20} />}
+                {isRevealed ? "Heritage Revealed" : "Reveal Ancestral Meaning"}
               </button>
-            ))}
-          </div>
-        </section>
+            </div>
+
+            <AnimatePresence>
+              {isRevealed && (
+                <motion.div 
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden bg-brand-green text-white"
+                >
+                  <div className="p-12 md:p-16 space-y-10 relative">
+                    <div className="absolute inset-0 pattern-bg opacity-10"></div>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-12 relative z-10">
+                      <div className="space-y-6">
+                        <div className="space-y-1">
+                          <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Pronunciation</p>
+                          <p className="text-3xl font-mono tracking-wider italic">/{currentPhrase.pronunciation}/</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Bahasa Malaysia</p>
+                          <p className="text-4xl font-black uppercase">{currentPhrase.meaningBM}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">English</p>
+                          <p className="text-3xl font-black opacity-80 decoration-accent-sand decoration-2 underline underline-offset-4 tracking-tight">"{currentPhrase.meaningEN}"</p>
+                        </div>
+                      </div>
+
+                      <div className="bg-white/10 p-8 rounded-[2.5rem] border border-white/10 backdrop-blur-md space-y-4">
+                        <p className="text-[10px] uppercase font-black text-white/40 tracking-[0.2em]">Cultural Note</p>
+                        <p className="text-lg font-medium leading-relaxed italic font-cultural">
+                          {currentPhrase.note}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        ) : (
+          <motion.section 
+            key={`quiz-${currentIndex}`}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="space-y-10 bg-white p-12 rounded-[4rem] border-2 border-brand-green/10 shadow-2xl card-shadow"
+          >
+            <div className="text-center space-y-4">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Ancestral Challenge</span>
+              {quizType === "kto_bm" && (
+                <>
+                  <h3 className="text-4xl font-black text-brand-green">What is the meaning in Malay?</h3>
+                  <p className="text-5xl font-black text-deep-forest py-6">"{currentPhrase.phrase}"</p>
+                </>
+              )}
+              {quizType === "kto_en" && (
+                <>
+                  <h3 className="text-4xl font-black text-brand-green">What is the meaning in English?</h3>
+                  <p className="text-5xl font-black text-deep-forest py-6">"{currentPhrase.phrase}"</p>
+                </>
+              )}
+              {quizType === "bmto_k" && (
+                <>
+                  <h3 className="text-4xl font-black text-brand-green">How do you say in Kadazandusun?</h3>
+                  <p className="text-5xl font-black text-deep-forest py-6">"{currentPhrase.meaningBM}"</p>
+                </>
+              )}
+              {quizType === "ento_k" && (
+                <>
+                  <h3 className="text-4xl font-black text-brand-green">How do you say in Kadazandusun?</h3>
+                  <p className="text-5xl font-black text-deep-forest py-6">"{currentPhrase.meaningEN}"</p>
+                </>
+              )}
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {options.map((opt) => (
+                <button
+                  key={opt.text}
+                  disabled={selectedOption !== null}
+                  onClick={() => handleOptionClick(opt)}
+                  className={cn(
+                    "p-6 rounded-[2rem] border-4 text-left transition-all font-black text-xl md:text-2xl shadow-sm",
+                    selectedOption === opt.text
+                      ? (opt.correct ? "bg-green-600 border-green-800 text-white shadow-2xl scale-[1.03] -translate-y-1" : "bg-red-500 border-red-700 text-white opacity-90")
+                      : "bg-brand-warm-white border-transparent hover:border-accent-sand/30 text-deep-forest hover:bg-soft-green hover:scale-[1.01]"
+                  )}
+                >
+                  {opt.text}
+                </button>
+              ))}
+            </div>
+          </motion.section>
+        )}
 
         {/* Navigation */}
         <div className="flex justify-between items-center pt-10">
           <button 
-            disabled={currentIndex === 0}
-            onClick={() => setCurrentIndex(currentIndex - 1)}
+            disabled={currentIndex === 0 && mode === "learning"}
+            onClick={back}
             className="px-10 py-5 text-brand-green font-black uppercase tracking-widest disabled:opacity-20 disabled:pointer-events-none hover:bg-soft-green rounded-3xl transition-all active:scale-95"
           >
             ← Back
@@ -900,12 +985,17 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
               e.preventDefault();
               next();
             }}
-            className="px-16 py-6 bg-deep-forest text-white rounded-full font-black text-2xl shadow-[0_20px_50px_rgba(27,67,50,0.4)] hover:brightness-125 transition-all transform active:scale-90 hover:scale-105"
+            disabled={mode === "quiz" && selectedOption === null}
+            className={cn(
+              "px-16 py-6 rounded-full font-black text-2xl shadow-[0_20px_50px_rgba(27,67,50,0.4)] transition-all transform active:scale-90 hover:scale-105",
+              (mode === "quiz" && selectedOption === null) ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none" : "bg-deep-forest text-white hover:brightness-125"
+            )}
           >
-            {currentIndex === lesson.phrases.length - 1 ? "Reclaim Heritage →" : "Proceed →"}
+            {mode === "learning" ? (currentIndex === lesson.phrases.length - 1 ? "Start Entrance Quiz →" : "Proceed →") : (currentIndex === lesson.phrases.length - 1 ? "Reclaim Heritage →" : "Next Question →")}
           </button>
         </div>
       </div>
+
       
       {/* Decorative Bottom */}
       <div className="h-4 w-full woven-border opacity-50 absolute bottom-0 left-0"></div>
