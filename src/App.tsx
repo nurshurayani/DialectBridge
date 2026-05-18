@@ -214,7 +214,7 @@ export default function App() {
         origin: postData.origin,
         note: postData.note,
         user_id: session.user.id,
-        name: session.user.email?.split('@')[0] || "Sabahan Spirit",
+        name: session.user.user_metadata?.username || session.user.email?.split('@')[0] || "Sabahan Spirit",
         upvotes: 0
       };
 
@@ -459,7 +459,7 @@ function UnconfiguredScreen() {
 }
 
 function AuthScreen() {
-  const [email, setEmail] = useState("");
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -467,15 +467,27 @@ function AuthScreen() {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    // Convert username to a valid internal email format for Supabase
+    const email = `${username.trim().toLowerCase()}@dialectbridge.auth`;
+    
     try {
       if (isSignUp) {
-        const { error } = await supabase.auth.signUp({ email, password });
+        const { error } = await supabase.auth.signUp({ 
+          email, 
+          password,
+          options: {
+            data: {
+              username: username.trim()
+            }
+          }
+        });
         if (error) throw error;
-        toast.success("Welcome! Check your email for verification.");
+        toast.success("Identity Secured! You can now sign in.");
+        setIsSignUp(false);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        toast.success("Welcome back, seeker.");
+        toast.success("Welcome back, guardian.");
       }
     } catch (error: any) {
       toast.error(error.message);
@@ -493,31 +505,25 @@ function AuthScreen() {
       >
         <header className="space-y-3">
           <h2 className="text-4xl md:text-5xl font-black text-brand-green tracking-tight">
-            {isSignUp ? "Create Descendant Account" : "Return to Roots"}
+            {isSignUp ? "Join the Bridge" : "Return to Roots"}
           </h2>
           <p className="text-deep-forest/50 font-medium italic">
             {isSignUp 
-              ? "Join the bridge and preserve your heritage voice." 
-              : "Welcome back, guardian of dialects."}
+              ? "Choose your guardian username." 
+              : "Welcome back, voice of the ancestors."}
           </p>
         </header>
 
-        <form onSubmit={handleAuth} className="space-y-6">
-          {isSignUp && (
-            <div className="bg-soft-green p-4 rounded-2xl text-[10px] font-bold text-brand-green/70 flex items-center gap-3">
-              <CheckCircle size={16} />
-              You will need to verify your email before signing in.
-            </div>
-          )}
+        <form onSubmit={handleAuth} className="space-y-6 mt-8">
           <div className="space-y-2">
-            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-2">Ancestral Email</label>
+            <label className="text-[10px] uppercase font-black text-gray-400 tracking-widest ml-2">Guardian Username</label>
             <input 
-              type="email"
+              type="text"
               required
-              placeholder="heritage@sabah.com"
+              placeholder="e.g. sabahan_spirit"
               className="w-full bg-brand-warm-white p-5 rounded-3xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
+              value={username}
+              onChange={e => setUsername(e.target.value)}
             />
           </div>
           <div className="space-y-2">
@@ -539,7 +545,7 @@ function AuthScreen() {
           >
             {loading ? (
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Volume2 size={24} /></motion.div>
-            ) : (isSignUp ? "Begin Journey" : "Enter the Bridge")}
+            ) : (isSignUp ? "Protect Identity" : "Enter the Bridge")}
           </button>
         </form>
 
@@ -547,8 +553,14 @@ function AuthScreen() {
           onClick={() => setIsSignUp(!isSignUp)}
           className="w-full mt-8 text-brand-green font-black text-sm hover:underline tracking-tight"
         >
-          {isSignUp ? "Already a guardian? Sign In" : "New descendant? Create Account"}
+          {isSignUp ? "Already a guardian? Sign In" : "New descendant? Create Identity"}
         </button>
+
+        <div className="mt-8 pt-8 border-t border-brand-green/5 text-center">
+          <p className="text-[9px] uppercase font-black text-gray-300 tracking-[0.2em] leading-relaxed">
+            Prototype Demo: No email verification required if "Confirm Email" is disabled in Supabase.
+          </p>
+        </div>
       </motion.div>
     </div>
   );
