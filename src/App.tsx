@@ -280,12 +280,12 @@ export default function App() {
           <div className="flex items-center gap-4 md:gap-6">
             <div className="flex items-center gap-2 bg-soft-green px-4 py-1.5 rounded-full">
               <span className="text-lg">🔥</span>
-              <span className="font-bold text-brand-green text-sm md:text-base">{userData?.streak} Day Streak</span>
+              <span className="font-bold text-brand-green text-sm md:text-base">{userData?.streak || 0} Day Streak</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="text-right hidden sm:block">
                 <p className="text-[10px] font-semibold uppercase opacity-60 tracking-wider">Level {Math.floor((userData?.xp || 0) / 100)}</p>
-                <p className="text-sm font-bold text-deep-forest">{userData?.dialect} Soul</p>
+                <p className="text-sm font-bold text-deep-forest">{userData?.dialect || "Kadazan"} Soul</p>
               </div>
               <div className="w-10 h-10 rounded-full border-2 border-brand-green overflow-hidden flex items-center justify-center bg-accent-sand transition-transform hover:scale-110">
                 <User className="text-white" size={20} />
@@ -339,7 +339,6 @@ export default function App() {
                   <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse"></span>
                   <p className="font-black text-deep-forest text-lg leading-tight">Kadazan-Dusun</p>
                 </div>
-                <span className="mt-2 inline-block px-3 py-1 bg-brand-green/20 text-brand-green text-[9px] font-black rounded-full uppercase tracking-tighter">Dialect Protocol Active</span>
               </div>
             </div>
           </aside>
@@ -588,7 +587,20 @@ function AuthScreen() {
 // --- SCREEN COMPONENTS ---
 
 function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void }) {
-  if (!user) return <div className="h-full flex items-center justify-center text-brand-green font-bold animate-pulse">Waking the ancestors...</div>;
+  const defaultUser = {
+    phrases_learned: 0,
+    xp: 0,
+    activity: [
+      { day: "Mon", count: 0 },
+      { day: "Tue", count: 0 },
+      { day: "Wed", count: 0 },
+      { day: "Thu", count: 0 },
+      { day: "Fri", count: 0 },
+      { day: "Sat", count: 0 },
+      { day: "Sun", count: 0 },
+    ]
+  };
+  const activeUser = user || defaultUser;
   const dailyPhrase = LESSONS[0].phrases[0];
 
   return (
@@ -658,7 +670,7 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void })
             <span className="text-3xl grayscale group-hover:grayscale-0 transition-all animate-bounce">📈</span> Recent Activity
           </h4>
           <div className="flex gap-4 items-end h-32 mb-6">
-            {user.activity?.map((entry: any, i: number) => (
+            {activeUser.activity?.map((entry: any, i: number) => (
               <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar">
                 <div 
                   className={cn(
@@ -681,11 +693,11 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void })
           <h4 className="font-black text-brand-green uppercase tracking-widest text-sm mb-8">Sabahan Warrior Stats</h4>
           <div className="space-y-10 relative z-10">
             <div>
-              <p className="text-6xl font-black text-brand-green leading-none">{user.phrases_learned || 0}</p>
+              <p className="text-6xl font-black text-brand-green leading-none">{activeUser.phrases_learned || 0}</p>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Words Reclaimed</p>
             </div>
             <div>
-              <p className="text-6xl font-black text-brand-green leading-none">{(user.xp || 0).toLocaleString()}</p>
+              <p className="text-6xl font-black text-brand-green leading-none">{(activeUser.xp || 0).toLocaleString()}</p>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Cultural XP</p>
             </div>
           </div>
@@ -1210,7 +1222,25 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
   );
 }
 function ProfileScreen({ user }: { user: any }) {
-  if (!user) return <div className="h-full flex items-center justify-center text-brand-green font-bold animate-pulse">Retrieving your scroll...</div>;
+  const defaultUser = {
+    streak: 0,
+    xp: 0,
+    lessons_completed: 0,
+    phrases_learned: 0,
+    activity: [
+      { day: "Mon", count: 0 },
+      { day: "Tue", count: 0 },
+      { day: "Wed", count: 0 },
+      { day: "Thu", count: 0 },
+      { day: "Fri", count: 0 },
+      { day: "Sat", count: 0 },
+      { day: "Sun", count: 0 },
+    ],
+    achievements: [
+      { id: "1", name: "First Steps", icon: "CheckCircle", description: "Joined the bridge" }
+    ]
+  };
+  const activeUser = user || defaultUser;
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -1230,10 +1260,10 @@ function ProfileScreen({ user }: { user: any }) {
           <p className="text-deep-forest/40 font-bold text-xl italic font-cultural leading-tight">"A descendant reclaiming what was once unheard."</p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-8">
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
-              <Flame size={22} className="text-orange-500 animate-pulse" /> {user.streak || 0} Day Streak
+              <Flame size={22} className="text-orange-500 animate-pulse" /> {activeUser.streak || 0} Day Streak
             </span>
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
-              <Trophy size={22} className="text-accent-sand" /> {user.xp || 0} XP Points
+              <Trophy size={22} className="text-accent-sand" /> {activeUser.xp || 0} XP Points
             </span>
             <button 
               onClick={() => supabase.auth.signOut()}
@@ -1256,7 +1286,7 @@ function ProfileScreen({ user }: { user: any }) {
           </h3>
           <div className="h-72 w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={user.activity || []}>
+              <RechartsBarChart data={activeUser.activity || []}>
                 <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 900, fill: '#1B4332', opacity: 0.3}} />
                 <Tooltip 
                   cursor={{fill: '#2D6A4F05'}}
@@ -1264,7 +1294,7 @@ function ProfileScreen({ user }: { user: any }) {
                   itemStyle={{color: 'white'}}
                 />
                 <Bar dataKey="count" radius={[16, 16, 16, 16]} barSize={24}>
-                  {(user.activity || []).map((entry: any, index: number) => (
+                  {(activeUser.activity || []).map((entry: any, index: number) => (
                     <Cell key={`cell-${index}`} fill={(entry.count || 0) > 0 ? '#2D6A4F' : '#F8F9FA'} className="transition-all hover:brightness-125" />
                   ))}
                 </Bar>
@@ -1281,7 +1311,7 @@ function ProfileScreen({ user }: { user: any }) {
            </div>
           <h3 className="text-3xl font-black text-deep-forest relative z-10">Sacred Badges</h3>
           <div className="grid grid-cols-2 gap-8 relative z-10">
-            {(user.achievements || []).map((ach: any) => (
+            {(activeUser.achievements || []).map((ach: any) => (
               <div key={ach.id} className="p-8 bg-brand-warm-white rounded-[2.5rem] flex flex-col items-center text-center gap-4 group border border-brand-green/5 hover:border-brand-green/20 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl">
                 <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-brand-green shadow-xl group-hover:scale-125 group-hover:rotate-12 transition-all ring-8 ring-soft-green">
                   {ach.icon === "CheckCircle" && <CheckCircle size={40} strokeWidth={2.5} />}
@@ -1293,8 +1323,8 @@ function ProfileScreen({ user }: { user: any }) {
                 </div>
               </div>
             ))}
-            <div className="p-8 bg-gray-50/50 border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center opacity-30 group cursor-not-allowed">
-              <div className="w-14 h-14 bg-white/50 rounded-[1.5rem] flex items-center justify-center text-gray-300 group-hover:shake transition-all">
+            <div className="p-8 bg-gray-50/50 border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center opacity-30 group cursor-not-allowed" title="Master more lessons to unlock">
+              <div className="w-14 h-14 bg-white/50 rounded-[1.5rem] flex items-center justify-center text-gray-300 group-hover:shake transition-all underline decoration-accent-sand/20">
                 <Library size={32} />
               </div>
               <p className="text-[10px] font-black mt-4 text-gray-400 tracking-[0.3em] uppercase">Locked</p>
@@ -1309,11 +1339,11 @@ function ProfileScreen({ user }: { user: any }) {
           <div className="w-full h-full pattern-bg"></div>
         </div>
         <div className="space-y-4 relative z-10">
-          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{user.lessons_completed || 0}</p>
+          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{activeUser.lessons_completed || 0}</p>
           <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-l-4 border-accent-sand/40 pl-4">Lessons Transmitted</p>
         </div>
         <div className="space-y-4 relative z-10 text-right">
-          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{user.phrases_learned || 0}</p>
+          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{activeUser.phrases_learned || 0}</p>
           <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-r-4 border-accent-sand/40 pr-4">Meanings Reclaimed</p>
         </div>
       </div>
@@ -1325,7 +1355,11 @@ function DictionaryScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
 
-  const filtered = DICTIONARY.filter(item => {
+  const sortedDictionary = React.useMemo(() => {
+    return [...DICTIONARY].sort((a, b) => a.phrase.localeCompare(b.phrase));
+  }, []);
+
+  const filtered = sortedDictionary.filter(item => {
     const matchesSearch = 
       item.phrase.toLowerCase().includes(search.toLowerCase()) || 
       item.meaningBM.toLowerCase().includes(search.toLowerCase()) ||
@@ -1350,17 +1384,17 @@ function DictionaryScreen() {
 
       <div className="bg-white p-8 rounded-[3rem] border border-brand-green/10 card-shadow space-y-8">
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-1 relative">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-green/40" size={24} />
+          <div className="flex-1 relative z-10">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-green/40 pointer-events-none" size={24} />
             <input 
               type="text"
               placeholder="Search words, BM meanings, or English..."
-              className="w-full bg-brand-warm-white py-5 pl-16 pr-8 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30"
+              className="w-full bg-brand-warm-white py-5 pl-16 pr-8 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30 relative z-10"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar relative z-10">
             <button 
               onClick={() => setFilter("All")}
               className={cn(
