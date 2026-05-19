@@ -734,11 +734,11 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
           <div className="space-y-10 relative z-10">
             <div>
               <p className="text-6xl font-black text-brand-green leading-none">{activeUser.phrases_learned || 0}</p>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Words Reclaimed</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Words Learned</p>
             </div>
             <div>
               <p className="text-6xl font-black text-brand-green leading-none">{(activeUser.xp || 0).toLocaleString()}</p>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Cultural XP</p>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">XP Points</p>
             </div>
           </div>
           <div className="mt-12 p-6 bg-soft-green rounded-[2.5rem] flex items-center gap-5 border border-brand-green/10 shadow-inner group/badge">
@@ -1346,10 +1346,21 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
           <h3 className="text-3xl font-black text-deep-forest flex items-center gap-4">
             <span className="text-accent-sand text-4xl">📊</span> Calibration History
           </h3>
-          <div className="h-72 w-full">
+          <div className="h-72 w-full relative">
+            {(activeUser.activity || []).every((a: any) => (a.count || 0) === 0) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] z-20 rounded-[2rem] text-center p-6 space-y-2">
+                <p className="text-lg font-black text-brand-green">No activity yet</p>
+                <p className="text-xs font-bold text-deep-forest/40">Start your first lesson to track progress</p>
+              </div>
+            )}
             <ResponsiveContainer width="100%" height="100%">
               <RechartsBarChart data={activeUser.activity || []}>
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{fontSize: 12, fontWeight: 900, fill: '#1B4332', opacity: 0.3}} />
+                <XAxis 
+                  dataKey="day" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 12, fontWeight: 900, fill: '#1B4332', opacity: 0.3}} 
+                />
                 <Tooltip 
                   cursor={{fill: '#2D6A4F05'}}
                   contentStyle={{borderRadius: '32px', border: 'none', background: '#1B4332', color: 'white', fontWeight: 900, fontSize: '14px', boxShadow: '0 20px 30px -10px rgba(0, 0, 0, 0.2)', padding: '20px'}}
@@ -1406,7 +1417,7 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
         </div>
         <div className="space-y-4 relative z-10 text-right">
           <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{activeUser.phrases_learned || 0}</p>
-          <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-r-4 border-accent-sand/40 pr-4">Meanings Reclaimed</p>
+          <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-r-4 border-accent-sand/40 pr-4">Words Learned</p>
         </div>
       </div>
     </motion.div>
@@ -1416,6 +1427,9 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
 function DictionaryScreen() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("All");
+  const [categoryFilter, setCategoryFilter] = useState("All");
+
+  const categories = ["All", "Greetings", "Family", "Numbers", "Colours", "Body Parts", "Food", "Nature"];
 
   const sortedDictionary = React.useMemo(() => {
     return [...DICTIONARY].sort((a, b) => a.phrase.localeCompare(b.phrase));
@@ -1428,8 +1442,10 @@ function DictionaryScreen() {
       item.meaningEN.toLowerCase().includes(search.toLowerCase()) ||
       (item.category && item.category.toLowerCase().includes(search.toLowerCase()));
     
-    const matchesFilter = filter === "All" || item.phrase.toUpperCase().startsWith(filter);
-    return matchesSearch && matchesFilter;
+    const matchesLetter = filter === "All" || item.phrase.toUpperCase().startsWith(filter);
+    const matchesCategory = categoryFilter === "All" || item.category === categoryFilter;
+    
+    return matchesSearch && matchesLetter && matchesCategory;
   });
 
   const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
@@ -1478,6 +1494,21 @@ function DictionaryScreen() {
                 )}
               >
                 {letter}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-4 no-scrollbar relative z-20">
+            {categories.map(cat => (
+              <button 
+                key={cat}
+                onClick={() => setCategoryFilter(cat)}
+                className={cn(
+                  "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
+                  categoryFilter === cat ? "bg-brand-green text-white shadow-md" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                )}
+              >
+                {cat}
               </button>
             ))}
           </div>
