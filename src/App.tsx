@@ -1084,9 +1084,8 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     phrase: "",
-    romanisation: "",
     meaning: "",
-    dialect: "Kadazan",
+    dialect: "Kadazan-Dusun",
     origin: "",
     note: ""
   });
@@ -1102,7 +1101,7 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
     onNewPost(newPost);
     toast.success("Ancestral wisdom shared!");
     setShowForm(false);
-    setFormData({ phrase: "", romanisation: "", meaning: "", dialect: "Kadazan", origin: "", note: "" });
+    setFormData({ phrase: "", meaning: "", dialect: "Kadazan-Dusun", origin: "", note: "" });
   };
 
   return (
@@ -1196,30 +1195,15 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
                 <button onClick={() => setShowForm(false)} className="p-3 hover:bg-white rounded-2xl transition-all hover:rotate-90 text-brand-green shadow-sm"><X size={24} /></button>
               </header>
               <form onSubmit={handleSubmit} className="p-10 space-y-6">
-                <div className="grid grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-2">Phrase</label>
-                    <input 
-                      required
-                      placeholder="e.g. Kopiwosion"
-                      className="w-full bg-brand-warm-white p-4 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30"
-                      value={formData.phrase}
-                      onChange={e => setFormData({...formData, phrase: e.target.value})}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-2">Dialect</label>
-                    <div className="relative">
-                      <select 
-                        className="w-full bg-brand-warm-white p-4 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold appearance-none cursor-pointer"
-                        value={formData.dialect}
-                        onChange={e => setFormData({...formData, dialect: e.target.value})}
-                      >
-                        {["Kadazan", "Dusun", "Bajau", "Murut"].map(d => <option key={d}>{d}</option>)}
-                      </select>
-                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-brand-green opacity-50">▾</div>
-                    </div>
-                  </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-2">Phrase</label>
+                  <input 
+                    required
+                    placeholder="e.g. Kopiwosion"
+                    className="w-full bg-brand-warm-white p-4 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30"
+                    value={formData.phrase}
+                    onChange={e => setFormData({...formData, phrase: e.target.value})}
+                  />
                 </div>
                 <div className="space-y-2">
                     <label className="text-[10px] uppercase font-black text-gray-400 tracking-[0.2em] ml-2">Meaning</label>
