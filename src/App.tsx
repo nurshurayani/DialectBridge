@@ -31,9 +31,10 @@ import {
   ResponsiveContainer,
   Cell
 } from "recharts";
-import { LESSONS, Lesson } from "./constants";
+import { LESSONS, Lesson, DICTIONARY, Phrase } from "./constants";
 import { Toaster, toast } from "react-hot-toast";
 import { clsx, type ClassValue } from "clsx";
+import { Search, Filter, Book, Sparkles } from "lucide-react";
 import { twMerge } from "tailwind-merge";
 import { supabase, isSupabaseConfigured } from "./lib/supabase";
 
@@ -41,7 +42,7 @@ function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-type Screen = "auth" | "home" | "explorer" | "lesson" | "community" | "profile" | "unconfigured";
+type Screen = "auth" | "home" | "explorer" | "lesson" | "community" | "profile" | "dictionary" | "unconfigured";
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(isSupabaseConfigured ? "auth" : "unconfigured");
@@ -312,6 +313,12 @@ export default function App() {
                 onClick={() => setCurrentScreen("explorer")} 
               />
               <SidebarLink 
+                icon="📖" 
+                label="Dictionary" 
+                active={currentScreen === "dictionary"} 
+                onClick={() => setCurrentScreen("dictionary")} 
+              />
+              <SidebarLink 
                 icon="💬" 
                 label="Community Wall" 
                 active={currentScreen === "community"} 
@@ -328,8 +335,11 @@ export default function App() {
             <div className="mt-auto">
               <div className="p-5 rounded-3xl bg-accent-sand/10 border border-accent-sand/20 shadow-inner">
                 <p className="text-[10px] font-bold text-accent-brown mb-2 uppercase tracking-widest leading-none">Current Dialect</p>
-                <p className="font-black text-deep-forest text-lg leading-tight">{userData?.dialect}</p>
-                <button className="mt-4 text-[10px] font-bold text-brand-green underline hover:text-deep-forest transition-colors uppercase tracking-widest">Change Dialect</button>
+                <div className="flex items-center gap-2">
+                  <span className="w-2 h-2 rounded-full bg-brand-green animate-pulse"></span>
+                  <p className="font-black text-deep-forest text-lg leading-tight">Kadazan-Dusun</p>
+                </div>
+                <span className="mt-2 inline-block px-3 py-1 bg-brand-green/20 text-brand-green text-[9px] font-black rounded-full uppercase tracking-tighter">Dialect Protocol Active</span>
               </div>
             </div>
           </aside>
@@ -340,6 +350,7 @@ export default function App() {
           <nav className="fixed bottom-0 left-0 right-0 h-16 bg-white border-t border-brand-green/10 flex justify-around items-center md:hidden z-30 shadow-[0_-5px_15px_rgba(0,0,0,0.03)]">
             <NavButton icon={<Home />} active={currentScreen === "home"} onClick={() => setCurrentScreen("home")} />
             <NavButton icon={<Library />} active={currentScreen === "explorer"} onClick={() => setCurrentScreen("explorer")} />
+            <NavButton icon={<Book />} active={currentScreen === "dictionary"} onClick={() => setCurrentScreen("dictionary")} />
             <NavButton icon={<Users />} active={currentScreen === "community"} onClick={() => setCurrentScreen("community")} />
             <NavButton icon={<User />} active={currentScreen === "profile"} onClick={() => setCurrentScreen("profile")} />
           </nav>
@@ -362,29 +373,28 @@ export default function App() {
               )}
               {currentScreen === "home" && (
                 <HomeScreen 
-                  key="home" 
                   user={userData} 
                   onContinue={() => setCurrentScreen("explorer")} 
                 />
               )}
               {currentScreen === "explorer" && (
                 <ExplorerScreen 
-                  key="explorer" 
                   onStartLesson={handleStartLesson} 
                 />
               )}
               {currentScreen === "community" && (
                 <CommunityScreen 
-                  key="community" 
                   posts={communityPosts} 
                   onNewPost={handleNewPost}
                 />
               )}
               {currentScreen === "profile" && (
                 <ProfileScreen 
-                  key="profile" 
                   user={userData} 
                 />
+              )}
+              {currentScreen === "dictionary" && (
+                <DictionaryScreen />
               )}
               {currentScreen === "lesson" && activeLesson && (
                 <LessonScreen 
@@ -577,7 +587,7 @@ function AuthScreen() {
 
 // --- SCREEN COMPONENTS ---
 
-function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void, key?: string }) {
+function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void }) {
   if (!user) return <div className="h-full flex items-center justify-center text-brand-green font-bold animate-pulse">Waking the ancestors...</div>;
   const dailyPhrase = LESSONS[0].phrases[0];
 
@@ -671,11 +681,11 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void, k
           <h4 className="font-black text-brand-green uppercase tracking-widest text-sm mb-8">Sabahan Warrior Stats</h4>
           <div className="space-y-10 relative z-10">
             <div>
-              <p className="text-6xl font-black text-brand-green leading-none">{user.phrasesLearned}</p>
+              <p className="text-6xl font-black text-brand-green leading-none">{user.phrases_learned || 0}</p>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Words Reclaimed</p>
             </div>
             <div>
-              <p className="text-6xl font-black text-brand-green leading-none">{user.xp.toLocaleString()}</p>
+              <p className="text-6xl font-black text-brand-green leading-none">{(user.xp || 0).toLocaleString()}</p>
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-3 underline decoration-accent-sand decoration-2">Cultural XP</p>
             </div>
           </div>
@@ -695,7 +705,7 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void, k
   );
 }
 
-function ExplorerScreen({ onStartLesson }: { onStartLesson: (lesson: Lesson) => void, key?: string }) {
+function ExplorerScreen({ onStartLesson }: { onStartLesson: (lesson: Lesson) => void }) {
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -757,7 +767,17 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   const [mode, setMode] = useState<"learning" | "quiz">("learning");
   const [quizType, setQuizType] = useState<"kto_bm" | "kto_en" | "bmto_k" | "ento_k">("kto_bm");
 
-  const currentPhrase = lesson.phrases[currentIndex];
+  const [quizOrder, setQuizOrder] = useState<number[]>([]);
+
+  useEffect(() => {
+    if (mode === "quiz") {
+      const order = Array.from({ length: lesson.phrases.length }, (_, i) => i);
+      setQuizOrder(order.sort(() => Math.random() - 0.5));
+    }
+  }, [mode, lesson.phrases.length]);
+
+  const currentPhraseIndex = mode === "learning" ? currentIndex : quizOrder[currentIndex] ?? 0;
+  const currentPhrase = lesson.phrases[currentPhraseIndex];
   
   const options = React.useMemo(() => {
     let correctText = "";
@@ -876,7 +896,7 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
                   isRevealed ? "bg-soft-green text-brand-green" : "bg-brand-green text-white shadow-xl"
                 )}
               >
-                {isRevealed ? <CheckCircle size={20} /> : <PlayCircle size={20} />}
+                {isRevealed ? <CheckCircle size={20} /> : <Sparkles size={20} />}
                 {isRevealed ? "Heritage Revealed" : "Reveal Ancestral Meaning"}
               </button>
             </div>
@@ -1008,7 +1028,7 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   );
 }
 
-function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post: any) => void, key?: string }) {
+function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post: any) => void | Promise<void> }) {
   const [showForm, setShowForm] = useState(false);
   const [formData, setFormData] = useState({
     phrase: "",
@@ -1189,8 +1209,7 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
     </motion.div>
   );
 }
-
-function ProfileScreen({ user }: { user: any, key?: string }) {
+function ProfileScreen({ user }: { user: any }) {
   if (!user) return <div className="h-full flex items-center justify-center text-brand-green font-bold animate-pulse">Retrieving your scroll...</div>;
   return (
     <motion.div 
@@ -1204,17 +1223,17 @@ function ProfileScreen({ user }: { user: any, key?: string }) {
           <Library size={200} />
         </div>
         <div className="w-40 h-40 pattern-bg rounded-[3rem] flex items-center justify-center text-white text-6xl font-black shadow-[0_20px_40px_rgba(45,106,79,0.3)] rotate-3 ring-12 ring-soft-green transition-transform group-hover:rotate-0">
-          {user.dialect[0]}
+          K
         </div>
         <div className="text-center md:text-left space-y-4 relative z-10">
-          <h2 className="text-5xl font-black text-brand-green tracking-tight leading-none">{user.dialect} Warrior</h2>
+          <h2 className="text-5xl font-black text-brand-green tracking-tight leading-none">Kadazan-Dusun Warrior</h2>
           <p className="text-deep-forest/40 font-bold text-xl italic font-cultural leading-tight">"A descendant reclaiming what was once unheard."</p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-8">
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
-              <Flame size={22} className="text-orange-500 animate-pulse" /> {user.streak} Day Streak
+              <Flame size={22} className="text-orange-500 animate-pulse" /> {user.streak || 0} Day Streak
             </span>
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
-              <Trophy size={22} className="text-accent-sand" /> {user.xp} XP Points
+              <Trophy size={22} className="text-accent-sand" /> {user.xp || 0} XP Points
             </span>
             <button 
               onClick={() => supabase.auth.signOut()}
@@ -1290,12 +1309,123 @@ function ProfileScreen({ user }: { user: any, key?: string }) {
           <div className="w-full h-full pattern-bg"></div>
         </div>
         <div className="space-y-4 relative z-10">
-          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{user.lessonsCompleted}</p>
+          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{user.lessons_completed || 0}</p>
           <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-l-4 border-accent-sand/40 pl-4">Lessons Transmitted</p>
         </div>
         <div className="space-y-4 relative z-10 text-right">
-          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{user.phrasesLearned}</p>
+          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{user.phrases_learned || 0}</p>
           <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-r-4 border-accent-sand/40 pr-4">Meanings Reclaimed</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+function DictionaryScreen() {
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("All");
+
+  const filtered = DICTIONARY.filter(item => {
+    const matchesSearch = 
+      item.phrase.toLowerCase().includes(search.toLowerCase()) || 
+      item.meaningBM.toLowerCase().includes(search.toLowerCase()) ||
+      item.meaningEN.toLowerCase().includes(search.toLowerCase());
+    const matchesFilter = filter === "All" || item.phrase.toUpperCase().startsWith(filter);
+    return matchesSearch && matchesFilter;
+  });
+
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("");
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -20 }}
+      className="space-y-10 pb-10"
+    >
+      <header className="space-y-1">
+        <h2 className="text-4xl font-black text-brand-green tracking-tight">Ancestral Dictionary</h2>
+        <p className="text-deep-forest/40 text-lg font-medium italic">Search through the collected wisdom of Kadazan-Dusun.</p>
+      </header>
+
+      <div className="bg-white p-8 rounded-[3rem] border border-brand-green/10 card-shadow space-y-8">
+        <div className="flex flex-col md:flex-row gap-6">
+          <div className="flex-1 relative">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-green/40" size={24} />
+            <input 
+              type="text"
+              placeholder="Search words, BM meanings, or English..."
+              className="w-full bg-brand-warm-white py-5 pl-16 pr-8 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar">
+            <button 
+              onClick={() => setFilter("All")}
+              className={cn(
+                "px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
+                filter === "All" ? "bg-brand-green text-white" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
+              )}
+            >
+              All
+            </button>
+            {alphabet.map(letter => (
+              <button 
+                key={letter}
+                onClick={() => setFilter(letter)}
+                className={cn(
+                  "w-10 h-10 flex items-center justify-center rounded-xl font-bold text-xs uppercase transition-all shrink-0",
+                  filter === letter ? "bg-brand-green text-white shadow-lg" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
+                )}
+              >
+                {letter}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <AnimatePresence mode="popLayout">
+            {filtered.map((item) => (
+              <motion.div 
+                layout
+                key={item.id}
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="bg-brand-warm-white/50 p-6 rounded-[2rem] border border-brand-green/5 group hover:border-brand-green/20 hover:bg-white transition-all card-shadow shadow-sm"
+              >
+                <div className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-2xl font-black text-brand-green leading-tight">{item.phrase}</h4>
+                    <span className="text-[10px] font-black text-accent-brown uppercase tracking-widest bg-accent-sand/10 px-3 py-1 rounded-full">K-D</span>
+                  </div>
+                  <p className="text-sm font-mono text-accent-sand italic">/{item.pronunciation}/</p>
+                  <div className="space-y-2 border-t border-brand-green/5 pt-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter w-6">BM</span>
+                      <p className="text-sm font-bold text-deep-forest">{item.meaningBM}</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter w-6">EN</span>
+                      <p className="text-sm font-bold text-deep-forest opacity-60 italic">"{item.meaningEN}"</p>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-gray-400 font-medium leading-relaxed font-cultural line-clamp-2">
+                    {item.note}
+                  </p>
+                </div>
+              </motion.div>
+            ))}
+          </AnimatePresence>
+
+          {filtered.length === 0 && (
+            <div className="col-span-full py-20 text-center space-y-4">
+              <Search className="mx-auto text-gray-200" size={64} />
+              <p className="text-deep-forest/40 font-bold italic">"This word has not yet returned to the library."</p>
+            </div>
+          )}
         </div>
       </div>
     </motion.div>
