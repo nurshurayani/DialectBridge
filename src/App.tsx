@@ -1463,8 +1463,8 @@ function DictionaryScreen() {
       </header>
 
       <div className="bg-white p-8 rounded-[3rem] border border-brand-green/10 card-shadow space-y-8">
-        <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-1 relative z-30">
+        <div className="space-y-6">
+          <div className="relative z-30">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-green/40 pointer-events-none" size={24} />
             <input 
               type="text"
@@ -1474,43 +1474,46 @@ function DictionaryScreen() {
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar relative z-20">
-            <button 
-              onClick={() => setFilter("All")}
-              className={cn(
-                "px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
-                filter === "All" ? "bg-brand-green text-white shadow-lg" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
-              )}
-            >
-              All
-            </button>
-            {alphabet.map(letter => (
+          
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar relative z-20">
               <button 
-                key={letter}
-                onClick={() => setFilter(letter)}
+                onClick={() => setFilter("All")}
                 className={cn(
-                  "w-10 h-10 flex items-center justify-center rounded-xl font-bold text-xs uppercase transition-all shrink-0",
-                  filter === letter ? "bg-brand-green text-white shadow-lg" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
+                  "px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
+                  filter === "All" ? "bg-brand-green text-white shadow-lg" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
                 )}
               >
-                {letter}
+                All
               </button>
-            ))}
-          </div>
+              {alphabet.map(letter => (
+                <button 
+                  key={letter}
+                  onClick={() => setFilter(letter)}
+                  className={cn(
+                    "w-10 h-10 flex items-center justify-center rounded-xl font-bold text-xs uppercase transition-all shrink-0",
+                    filter === letter ? "bg-brand-green text-white shadow-lg" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
+                  )}
+                >
+                  {letter}
+                </button>
+              ))}
+            </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-4 no-scrollbar relative z-20">
-            {categories.map(cat => (
-              <button 
-                key={cat}
-                onClick={() => setCategoryFilter(cat)}
-                className={cn(
-                  "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
-                  categoryFilter === cat ? "bg-brand-green text-white shadow-md" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
-                )}
-              >
-                {cat}
-              </button>
-            ))}
+            <div className="flex flex-wrap items-center gap-2 relative z-20">
+              {categories.map(cat => (
+                <button 
+                  key={cat}
+                  onClick={() => setCategoryFilter(cat)}
+                  className={cn(
+                    "px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
+                    categoryFilter === cat ? "bg-brand-green text-white shadow-md" : "bg-gray-100 text-gray-400 hover:bg-gray-200"
+                  )}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
