@@ -7,6 +7,7 @@ export interface Phrase {
   meaningBM: string;
   meaningEN: string;
   note: string;
+  category?: string;
 }
 
 export interface Lesson {
@@ -22,47 +23,55 @@ export interface Lesson {
 
 export const DICTIONARY: Phrase[] = [
   // Page 6-7: Colours
-  { id: "d_c1", phrase: "Oitom", pronunciation: "Oy-tom", meaningBM: "Hitam", meaningEN: "Black", note: "One of the four primary colours." },
-  { id: "d_c2", phrase: "Obulou", pronunciation: "O-boo-loh", meaningBM: "Biru", meaningEN: "Blue", note: "The colour of the sea." },
-  { id: "d_c3", phrase: "Aragang", pronunciation: "A-ra-gang", meaningBM: "Merah", meaningEN: "Red", note: "The colour of strength." },
-  { id: "d_c4", phrase: "Osilou", pronunciation: "O-see-loh", meaningBM: "Kuning", meaningEN: "Yellow", note: "The colour of the sun." },
-  { id: "d_c5", phrase: "Opurak", pronunciation: "O-poo-rak", meaningBM: "Putih", meaningEN: "White", note: "Pure and clean." },
-  { id: "d_c6", phrase: "Otomou", pronunciation: "O-to-moh", meaningBM: "Hijau", meaningEN: "Green", note: "The colour of forests." },
-  { id: "d_c7", phrase: "Obuhog", pronunciation: "O-boo-hog", meaningBM: "Kelabu", meaningEN: "Grey", note: "The colour of rain clouds." },
-  { id: "d_c8", phrase: "Orin", pronunciation: "O-rin", meaningBM: "Jingga", meaningEN: "Orange", note: "Vibrant and bright." },
-  { id: "d_c9", phrase: "Sokulit", pronunciation: "So-koo-lit", meaningBM: "Perang", meaningEN: "Brown", note: "The colour of the earth." },
-  { id: "d_c10", phrase: "Moruun", pronunciation: "Mo-roon", meaningBM: "Merah tua", meaningEN: "Maroon", note: "Dark and deep red." },
+  { id: "d_c1", phrase: "Oitom", pronunciation: "Oy-tom", meaningBM: "Hitam", meaningEN: "Black", note: "One of the four primary colours.", category: "Colours" },
+  { id: "d_c2", phrase: "Obulou", pronunciation: "O-boo-loh", meaningBM: "Biru", meaningEN: "Blue", note: "The colour of the sea.", category: "Colours" },
+  { id: "d_c3", phrase: "Aragang", pronunciation: "A-ra-gang", meaningBM: "Merah", meaningEN: "Red", note: "The colour of strength.", category: "Colours" },
+  { id: "d_c4", phrase: "Osilou", pronunciation: "O-see-loh", meaningBM: "Kuning", meaningEN: "Yellow", note: "The colour of the sun.", category: "Colours" },
+  { id: "d_c5", phrase: "Opurak", pronunciation: "O-poo-rak", meaningBM: "Putih", meaningEN: "White", note: "Pure and clean.", category: "Colours" },
+  { id: "d_c6", phrase: "Otomou", pronunciation: "O-to-moh", meaningBM: "Hijau", meaningEN: "Green", note: "The colour of forests.", category: "Colours" },
+  { id: "d_c7", phrase: "Obuhog", pronunciation: "O-boo-hog", meaningBM: "Kelabu", meaningEN: "Grey", note: "The colour of rain clouds.", category: "Colours" },
+  { id: "d_c8", phrase: "Orin", pronunciation: "O-rin", meaningBM: "Jingga", meaningEN: "Orange", note: "Vibrant and bright.", category: "Colours" },
+  { id: "d_c9", phrase: "Sokulit", pronunciation: "So-koo-lit", meaningBM: "Perang", meaningEN: "Brown", note: "The colour of the earth.", category: "Colours" },
+  { id: "d_c10", phrase: "Moruun", pronunciation: "Mo-roon", meaningBM: "Merah tua", meaningEN: "Maroon", note: "Dark and deep red.", category: "Colours" },
   
   // Page 8: Numbers
-  { id: "d_n1", phrase: "Iso", pronunciation: "Ee-so", meaningBM: "Satu", meaningEN: "One", note: "First count." },
-  { id: "d_n2", phrase: "Duo", pronunciation: "Doo-oh", meaningBM: "Dua", meaningEN: "Two", note: "Pair." },
-  { id: "d_n3", phrase: "Tolu", pronunciation: "To-loo", meaningBM: "Tiga", meaningEN: "Three", note: "Triple." },
-  { id: "d_n4", phrase: "Apat", pronunciation: "A-pat", meaningBM: "Empat", meaningEN: "Four", note: "Square base." },
-  { id: "d_n5", phrase: "Limo", pronunciation: "Lee-mo", meaningBM: "Lima", meaningEN: "Five", note: "Hand count." },
-  { id: "d_n6", phrase: "Onom", pronunciation: "O-nom", meaningBM: "Enam", meaningEN: "Six", note: "Next step." },
-  { id: "d_n7", phrase: "Turu", pronunciation: "Too-roo", meaningBM: "Tujuh", meaningEN: "Seven", note: "Lucky seven." },
-  { id: "d_n8", phrase: "Walu", pronunciation: "Wa-loo", meaningBM: "Lapan", meaningEN: "Eight", note: "Octopus legs." },
-  { id: "d_n9", phrase: "Siam", pronunciation: "See-am", meaningBM: "Sembilan", meaningEN: "Nine", note: "Last single digit." },
-  { id: "d_n10", phrase: "Hopod", pronunciation: "Ho-pod", meaningBM: "Sepuluh", meaningEN: "Ten", note: "Full set." },
+  { id: "d_n1", phrase: "Iso", pronunciation: "Ee-so", meaningBM: "Satu", meaningEN: "One", note: "First count.", category: "Numbers" },
+  { id: "d_n2", phrase: "Duo", pronunciation: "Doo-oh", meaningBM: "Dua", meaningEN: "Two", note: "Pair.", category: "Numbers" },
+  { id: "d_n3", phrase: "Tolu", pronunciation: "To-loo", meaningBM: "Tiga", meaningEN: "Three", note: "Triple.", category: "Numbers" },
+  { id: "d_n4", phrase: "Apat", pronunciation: "A-pat", meaningBM: "Empat", meaningEN: "Four", note: "Square base.", category: "Numbers" },
+  { id: "d_n5", phrase: "Limo", pronunciation: "Lee-mo", meaningBM: "Lima", meaningEN: "Five", note: "Hand count.", category: "Numbers" },
+  { id: "d_n6", phrase: "Onom", pronunciation: "O-nom", meaningBM: "Enam", meaningEN: "Six", note: "Next step.", category: "Numbers" },
+  { id: "d_n7", phrase: "Turu", pronunciation: "Too-roo", meaningBM: "Tujuh", meaningEN: "Seven", note: "Lucky seven.", category: "Numbers" },
+  { id: "d_n8", phrase: "Walu", pronunciation: "Wa-loo", meaningBM: "Lapan", meaningEN: "Eight", note: "Octopus legs.", category: "Numbers" },
+  { id: "d_n9", phrase: "Siam", pronunciation: "See-am", meaningBM: "Sembilan", meaningEN: "Nine", note: "Last single digit.", category: "Numbers" },
+  { id: "d_n10", phrase: "Hopod", pronunciation: "Ho-pod", meaningBM: "Sepuluh", meaningEN: "Ten", note: "Full set.", category: "Numbers" },
   
   // Page 9: Body
-  { id: "d_b1", phrase: "Tulu", pronunciation: "Too-loo", meaningBM: "Kepala", meaningEN: "Head", note: "Top of the body." },
-  { id: "d_b2", phrase: "Turos", pronunciation: "Too-ros", meaningBM: "Muka", meaningEN: "Face", note: "Look at me." },
-  { id: "d_b3", phrase: "Longon", pronunciation: "Lo-ngon", meaningBM: "Lengan", meaningEN: "Arm", note: "Upper limb." },
-  { id: "d_b4", phrase: "Palad", pronunciation: "Pa-lad", meaningBM: "Tapak Tangan", meaningEN: "Palm / Hand", note: "Hold something." },
-  { id: "d_b5", phrase: "Lukap", pronunciation: "Loo-kap", meaningBM: "Kaki", meaningEN: "Foot", note: "Walk on earth." },
-  { id: "d_b6", phrase: "Tunduundu'", pronunciation: "Toon-doon-doo", meaningBM: "Jantung/Hati", meaningEN: "Heart", note: "Beat of life." },
-  { id: "d_b7", phrase: "Mato", pronunciation: "Ma-to", meaningBM: "Mata", meaningEN: "Eye", note: "To see clearly." },
-  { id: "d_b8", phrase: "Tolingo", pronunciation: "To-lee-ngo", meaningBM: "Telinga", meaningEN: "Ear", note: "To hear the forest." },
-  { id: "d_b9", phrase: "Todung", pronunciation: "To-doong", meaningBM: "Hidung", meaningEN: "Nose", note: "To smell incense." },
-  { id: "d_b10", phrase: "Kabang", pronunciation: "Ka-bang", meaningBM: "Mulut", meaningEN: "Mouth", note: "To speak truth." },
-  { id: "d_b11", phrase: "Nipon", pronunciation: "Nee-pon", meaningBM: "Gigi", meaningEN: "Teeth", note: "To chew food." },
-  { id: "d_b12", phrase: "Dila", pronunciation: "Dee-la", meaningBM: "Lidah", meaningEN: "Tongue", note: "To taste seasons." },
+  { id: "d_b1", phrase: "Tulu", pronunciation: "Too-loo", meaningBM: "Kepala", meaningEN: "Head", note: "Top of the body.", category: "Body" },
+  { id: "d_b2", phrase: "Turos", pronunciation: "Too-ros", meaningBM: "Muka", meaningEN: "Face", note: "Look at me.", category: "Body" },
+  { id: "d_b3", phrase: "Longon", pronunciation: "Lo-ngon", meaningBM: "Lengan", meaningEN: "Arm", note: "Upper limb.", category: "Body" },
+  { id: "d_b4", phrase: "Palad", pronunciation: "Pa-lad", meaningBM: "Tapak Tangan", meaningEN: "Palm / Hand", note: "Hold something.", category: "Body" },
+  { id: "d_b5", phrase: "Lukap", pronunciation: "Loo-kap", meaningBM: "Kaki", meaningEN: "Foot", note: "Walk on earth.", category: "Body" },
+  { id: "d_b6", phrase: "Tunduundu'", pronunciation: "Toon-doon-doo", meaningBM: "Jantung/Hati", meaningEN: "Heart", note: "Beat of life.", category: "Body" },
+  { id: "d_b7", phrase: "Mato", pronunciation: "Ma-to", meaningBM: "Mata", meaningEN: "Eye", note: "To see clearly.", category: "Body" },
+  { id: "d_b8", pronunciation: "To-lee-ngo", meaningBM: "Telinga", meaningEN: "Ear", phrase: "Tolingo", note: "To hear the forest.", category: "Body" },
+  { id: "d_b9", phrase: "Todung", pronunciation: "To-doong", meaningBM: "Hidung", meaningEN: "Nose", note: "To smell incense.", category: "Body" },
+  { id: "d_b10", phrase: "Kabang", pronunciation: "Ka-bang", meaningBM: "Mulut", meaningEN: "Mouth", note: "To speak truth.", category: "Body" },
+  { id: "d_b11", phrase: "Nipon", pronunciation: "Nee-pon", meaningBM: "Gigi", meaningEN: "Teeth", note: "To chew food.", category: "Body" },
+  { id: "d_b12", phrase: "Dila", pronunciation: "Dee-la", meaningBM: "Lidah", meaningEN: "Tongue", note: "To taste seasons.", category: "Body" },
   
+  // Family members
+  { id: "d_f1", phrase: "Tama", pronunciation: "Ta-ma", meaningBM: "Ayah", meaningEN: "Father", note: "A respectful term for father.", category: "Family" },
+  { id: "d_f2", phrase: "Tina", pronunciation: "Tee-na", meaningBM: "Ibu", meaningEN: "Mother", note: "A respectful term for mother.", category: "Family" },
+  { id: "d_f3", phrase: "Aki", pronunciation: "A-kee", meaningBM: "Datuk", meaningEN: "Grandfather", note: "Grandfather or elderly man.", category: "Family" },
+  { id: "d_f4", phrase: "Odu", pronunciation: "O-doo", meaningBM: "Nenek", meaningEN: "Grandmother", note: "Grandmother or elderly woman.", category: "Family" },
+  { id: "d_f5", phrase: "Koduo", pronunciation: "Ko-doo-oh", meaningBM: "Adik-beradik", meaningEN: "Sibling", note: "Brother or sister.", category: "Family" },
+  { id: "d_f6", phrase: "Anak", pronunciation: "A-nak", meaningBM: "Anak", meaningEN: "Child", note: "One's offspring.", category: "Family" },
+
   // Page 17: House
-  { id: "d_h1", phrase: "Totobon", pronunciation: "To-to-bon", meaningBM: "Pintu", meaningEN: "Door", note: "Entry to the home." },
-  { id: "d_h2", phrase: "Tinongusan", pronunciation: "Tee-no-ngoo-san", meaningBM: "Bumbung", meaningEN: "Roof", note: "Shelter above us." },
-  { id: "d_h3", phrase: "Titigaon", pronunciation: "Tee-tee-ga-on", meaningBM: "Tingkap", meaningEN: "Window", note: "Light into the room." },
+  { id: "d_h1", phrase: "Totobon", pronunciation: "To-to-bon", meaningBM: "Pintu", meaningEN: "Door", note: "Entry to the home.", category: "House" },
+  { id: "d_h2", phrase: "Tinongusan", pronunciation: "Tee-no-ngoo-san", meaningBM: "Bumbung", meaningEN: "Roof", note: "Shelter above us.", category: "House" },
+  { id: "d_h3", phrase: "Titigaon", pronunciation: "Tee-tee-ga-on", meaningBM: "Tingkap", meaningEN: "Window", note: "Light into the room.", category: "House" },
 ];
 
 export const LESSONS: Lesson[] = [

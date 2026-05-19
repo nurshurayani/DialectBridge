@@ -52,6 +52,35 @@ export default function App() {
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [session, setSession] = useState<any>(null);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [favourites, setFavourites] = useState<Phrase[]>([]);
+
+  useEffect(() => {
+    const stored = localStorage.getItem("dialect_bridge_favourites");
+    if (stored) {
+      try {
+        setFavourites(JSON.parse(stored));
+      } catch (e) {
+        console.error("Failed to parse favourites", e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    localStorage.setItem("dialect_bridge_favourites", JSON.stringify(favourites));
+  }, [favourites]);
+
+  const toggleFavourite = (phrase: Phrase) => {
+    setFavourites(prev => {
+      const isFav = prev.find(p => p.id === phrase.id);
+      if (isFav) {
+        toast.success("Wisdom removed from favourites");
+        return prev.filter(p => p.id !== phrase.id);
+      } else {
+        toast.success("Wisdom preserved in favourites");
+        return [...prev, phrase];
+      }
+    });
+  };
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -287,9 +316,12 @@ export default function App() {
                 <p className="text-[10px] font-semibold uppercase opacity-60 tracking-wider">Level {Math.floor((userData?.xp || 0) / 100)}</p>
                 <p className="text-sm font-bold text-deep-forest">{userData?.dialect || "Kadazan"} Soul</p>
               </div>
-              <div className="w-10 h-10 rounded-full border-2 border-brand-green overflow-hidden flex items-center justify-center bg-accent-sand transition-transform hover:scale-110">
+              <button 
+                onClick={() => setCurrentScreen("profile")}
+                className="w-10 h-10 rounded-full border-2 border-brand-green overflow-hidden flex items-center justify-center bg-accent-sand transition-transform hover:scale-110 active:scale-95 cursor-pointer"
+              >
                 <User className="text-white" size={20} />
-              </div>
+              </button>
             </div>
           </div>
         </nav>
@@ -374,6 +406,8 @@ export default function App() {
                 <HomeScreen 
                   user={userData} 
                   onContinue={() => setCurrentScreen("explorer")} 
+                  favourites={favourites}
+                  onToggleFavourite={toggleFavourite}
                 />
               )}
               {currentScreen === "explorer" && (
@@ -390,6 +424,8 @@ export default function App() {
               {currentScreen === "profile" && (
                 <ProfileScreen 
                   user={userData} 
+                  favourites={favourites}
+                  onToggleFavourite={toggleFavourite}
                 />
               )}
               {currentScreen === "dictionary" && (
@@ -586,7 +622,7 @@ function AuthScreen() {
 
 // --- SCREEN COMPONENTS ---
 
-function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void }) {
+function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user: any, onContinue: () => void, favourites: Phrase[], onToggleFavourite: (phrase: Phrase) => void }) {
   const defaultUser = {
     phrases_learned: 0,
     xp: 0,
@@ -602,6 +638,7 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void })
   };
   const activeUser = user || defaultUser;
   const dailyPhrase = LESSONS[0].phrases[0];
+  const isStarred = favourites.some(p => p.id === dailyPhrase.id);
 
   return (
     <motion.div 
@@ -653,11 +690,14 @@ function HomeScreen({ user, onContinue }: { user: any, onContinue: () => void })
           </div>
           
           <div className="hidden lg:flex flex-col gap-4">
-             <button className="w-20 h-20 rounded-[2rem] bg-soft-green flex items-center justify-center border-2 border-brand-green/10 text-brand-green hover:bg-brand-green hover:text-white transition-all shadow-lg hover:rotate-6">
-                <Volume2 size={32} />
-              </button>
-              <button className="w-20 h-20 rounded-[2rem] bg-soft-green flex items-center justify-center border-2 border-brand-green/10 text-brand-green hover:bg-brand-green hover:text-white transition-all shadow-lg hover:-rotate-6 text-3xl">
-                ⭐
+              <button 
+                onClick={() => onToggleFavourite(dailyPhrase)}
+                className={cn(
+                  "w-20 h-20 rounded-[2rem] bg-soft-green flex items-center justify-center border-2 border-brand-green/10 text-brand-green hover:bg-brand-green hover:text-white transition-all shadow-lg hover:-rotate-6 text-3xl",
+                  isStarred && "bg-brand-green text-white"
+                )}
+              >
+                {isStarred ? "⭐" : "☆"}
               </button>
           </div>
         </div>
@@ -1221,7 +1261,7 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
     </motion.div>
   );
 }
-function ProfileScreen({ user }: { user: any }) {
+function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, favourites: Phrase[], onToggleFavourite: (phrase: Phrase) => void }) {
   const defaultUser = {
     streak: 0,
     xp: 0,
@@ -1274,6 +1314,44 @@ function ProfileScreen({ user }: { user: any }) {
           </div>
         </div>
       </header>
+
+      {/* Favourites Section */}
+      <section className="bg-white p-12 rounded-[4rem] border border-brand-green/10 shadow-sm space-y-10 card-shadow">
+        <h3 className="text-3xl font-black text-deep-forest flex items-center gap-4">
+          <span className="text-accent-sand text-4xl">⭐</span> Ancestral Favourites
+        </h3>
+        
+        {favourites.length === 0 ? (
+          <div className="py-20 text-center space-y-4 bg-brand-warm-white rounded-[3rem] border-2 border-dashed border-brand-green/10">
+            <p className="text-2xl font-bold text-brand-green/40 italic">"No wisdom preserved yet..."</p>
+            <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Star phrases in the Home Hub or Dictionary to see them here.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {favourites.map((phrase) => (
+              <div key={phrase.id} className="p-8 bg-brand-warm-white rounded-[2.5rem] border border-brand-green/5 flex flex-col justify-between group">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-start">
+                    <h4 className="text-3xl font-black text-brand-green">{phrase.phrase}</h4>
+                    <button 
+                      onClick={() => onToggleFavourite(phrase)}
+                      className="text-brand-green hover:text-red-500 transition-colors"
+                      title="Unfavourite"
+                    >
+                      <X size={20} />
+                    </button>
+                  </div>
+                  <p className="text-sm font-mono text-accent-sand font-bold">/{phrase.pronunciation}/</p>
+                  <div className="space-y-2 pt-4 border-t border-brand-green/5">
+                    <p className="text-sm font-bold text-deep-forest"><span className="text-[10px] uppercase opacity-40 mr-2">BM:</span> {phrase.meaningBM}</p>
+                    <p className="text-sm font-medium text-deep-forest/70 italic"><span className="text-[10px] uppercase opacity-40 mr-2">EN:</span> "{phrase.meaningEN}"</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         {/* Activity Chart */}
@@ -1363,7 +1441,9 @@ function DictionaryScreen() {
     const matchesSearch = 
       item.phrase.toLowerCase().includes(search.toLowerCase()) || 
       item.meaningBM.toLowerCase().includes(search.toLowerCase()) ||
-      item.meaningEN.toLowerCase().includes(search.toLowerCase());
+      item.meaningEN.toLowerCase().includes(search.toLowerCase()) ||
+      (item.category && item.category.toLowerCase().includes(search.toLowerCase()));
+    
     const matchesFilter = filter === "All" || item.phrase.toUpperCase().startsWith(filter);
     return matchesSearch && matchesFilter;
   });
@@ -1384,22 +1464,22 @@ function DictionaryScreen() {
 
       <div className="bg-white p-8 rounded-[3rem] border border-brand-green/10 card-shadow space-y-8">
         <div className="flex flex-col md:flex-row gap-6">
-          <div className="flex-1 relative z-10">
+          <div className="flex-1 relative z-30">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-brand-green/40 pointer-events-none" size={24} />
             <input 
               type="text"
-              placeholder="Search words, BM meanings, or English..."
-              className="w-full bg-brand-warm-white py-5 pl-16 pr-8 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30 relative z-10"
+              placeholder="Search words, meanings, or categories..."
+              className="w-full bg-brand-warm-white py-5 pl-16 pr-8 rounded-2xl outline-none focus:ring-4 ring-brand-green/10 border-2 border-transparent focus:border-brand-green/20 transition-all font-bold placeholder:opacity-30 relative z-30 cursor-text"
               value={search}
               onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar relative z-10">
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 no-scrollbar relative z-20">
             <button 
               onClick={() => setFilter("All")}
               className={cn(
                 "px-5 py-3 rounded-xl font-bold text-xs uppercase tracking-widest transition-all",
-                filter === "All" ? "bg-brand-green text-white" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
+                filter === "All" ? "bg-brand-green text-white shadow-lg" : "bg-soft-green text-brand-green hover:bg-brand-green/10"
               )}
             >
               All
@@ -1433,7 +1513,9 @@ function DictionaryScreen() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-start">
                     <h4 className="text-2xl font-black text-brand-green leading-tight">{item.phrase}</h4>
-                    <span className="text-[10px] font-black text-accent-brown uppercase tracking-widest bg-accent-sand/10 px-3 py-1 rounded-full">K-D</span>
+                    <span className="text-[9px] font-black text-accent-brown uppercase tracking-widest bg-accent-sand/20 px-3 py-1 rounded-full whitespace-nowrap">
+                      {item.category || "General"}
+                    </span>
                   </div>
                   <p className="text-sm font-mono text-accent-sand italic">/{item.pronunciation}/</p>
                   <div className="space-y-2 border-t border-brand-green/5 pt-4">
@@ -1446,9 +1528,6 @@ function DictionaryScreen() {
                       <p className="text-sm font-bold text-deep-forest opacity-60 italic">"{item.meaningEN}"</p>
                     </div>
                   </div>
-                  <p className="text-[10px] text-gray-400 font-medium leading-relaxed font-cultural line-clamp-2">
-                    {item.note}
-                  </p>
                 </div>
               </motion.div>
             ))}
