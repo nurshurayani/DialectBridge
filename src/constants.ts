@@ -140,6 +140,23 @@ export const DICTIONARY: Phrase[] = [
   { id: "nat13", phrase: "Lopot", pronunciation: "Lo-pot", meaningBM: "Kabus", meaningEN: "Fog", note: "Morning mountain mist.", category: "Nature" },
   { id: "nat14", phrase: "Tungkusan", pronunciation: "Toong-koo-san", meaningBM: "Warisan", meaningEN: "Heritage", note: "Natural heritage.", category: "Nature" },
   { id: "nat15", phrase: "Kokorisan", pronunciation: "Ko-ko-ree-san", meaningBM: "Pelangi", meaningEN: "Rainbow", note: "Beautiful arc of color.", category: "Nature" },
+
+  // Celebrations (15 phrases)
+  { id: "cel1", phrase: "Kaamatan", pronunciation: "Kaa-ma-tan", meaningBM: "Pesta Kaamatan", meaningEN: "Harvest Festival", note: "The most important cultural festival in Sabah.", category: "Celebrations" },
+  { id: "cel2", phrase: "Unduk Ngadau", pronunciation: "Oon-dook Nga-dow", meaningBM: "Ratu Cantik Kaamatan", meaningEN: "Harvest Queen beauty title", note: "Beauty pageant held during Kaamatan reflecting Huminodun's beauty.", category: "Celebrations" },
+  { id: "cel3", phrase: "Magavau", pronunciation: "Ma-ga-vow", meaningBM: "Upacara memanggil semangat", meaningEN: "Paddy spirit summoning ritual", note: "Ritual to restore and summon the paddy spirit.", category: "Celebrations" },
+  { id: "cel4", phrase: "Sumazau", pronunciation: "Soo-ma-zow", meaningBM: "Tarian Sumazau", meaningEN: "Traditional dance", note: "The national dance of the Kadazandusun people, mimicking birds flying.", category: "Celebrations" },
+  { id: "cel5", phrase: "Sogit", pronunciation: "So-git", meaningBM: "Sogit (Denda adat)", meaningEN: "Traditional peace offering / fine", note: "A payment/sacrifice to restore communal balance under native law.", category: "Celebrations" },
+  { id: "cel6", phrase: "Mogunting", pronunciation: "Mo-goon-ting", meaningBM: "Upacara potong rambut", meaningEN: "First hair cutting ceremony", note: "Ritual marking a baby's integration into the community.", category: "Celebrations" },
+  { id: "cel7", phrase: "Mitatab", pronunciation: "Mee-ta-tab", meaningBM: "Upacara keramaian", meaningEN: "Celebration gathering", note: "Festive gathering of friends and family.", category: "Celebrations" },
+  { id: "cel8", phrase: "Kotobian Tadau Kaamatan", pronunciation: "Ko-to-bhee-an Ta-dow Kaa-ma-tan", meaningBM: "Selamat Hari Kaamatan", meaningEN: "Happy Harvest Festival", note: "The standard festive greeting during the harvest season.", category: "Celebrations" },
+  { id: "cel9", phrase: "Pangkis", pronunciation: "Pang-kees", meaningBM: "Jeritan kemenangan (Sumazau)", meaningEN: "Triumphant Sumazau cry", note: "High-pitched shout made by men during the Sumazau dance.", category: "Celebrations" },
+  { id: "cel10", phrase: "Inavol", pronunciation: "Ee-na-vol", meaningBM: "Kain tenunan tradisi", meaningEN: "Traditional hand-woven cloth", note: "Beautifully patterns of the Rungus or Kadazan weaving.", category: "Celebrations" },
+  { id: "cel11", phrase: "Gong", pronunciation: "Gong", meaningBM: "Gong", meaningEN: "Traditional brass instrument", note: "An ensemble of gongs is key to Kadazandusun festivities.", category: "Celebrations" },
+  { id: "cel12", phrase: "Bambazan", pronunciation: "Bam-ba-zan", meaningBM: "Semangat Padi / Bambaazon", meaningEN: "The sacred paddy spirit", note: "The spirit of Huminodun residing in the harvested rice.", category: "Celebrations" },
+  { id: "cel13", phrase: "Kozutan", pronunciation: "Ko-zoo-tan", meaningBM: "Sorakan gembira", meaningEN: "Joyful celebration cheer", note: "A cheer raised during moments of intense celebration.", category: "Celebrations" },
+  { id: "cel14", phrase: "Mogonsok", pronunciation: "Mo-gon-sok", meaningBM: "Memasak beramai-ramai", meaningEN: "Group feast cooking", note: "Preparing large meals collectively for a village feast.", category: "Celebrations" },
+  { id: "cel15", phrase: "Rampayan", pronunciation: "Ram-pa-yan", meaningBM: "Hiasan tradisi", meaningEN: "Traditional festive decoration", note: "Decorations made from bamboo and young coconut leaves.", category: "Celebrations" }
 ];
 
 export const LESSONS: Lesson[] = [
@@ -212,5 +229,15 @@ export const LESSONS: Lesson[] = [
     isCompleted: false,
     category: "Nature",
     phrases: DICTIONARY.filter(item => item.category === "Nature"),
+  },
+  {
+    id: "l11",
+    title: "Celebrations",
+    icon: "Sparkles",
+    phrasesCount: 15,
+    progress: 0,
+    isCompleted: false,
+    category: "Celebrations",
+    phrases: DICTIONARY.filter(item => item.category === "Celebrations"),
   }
 ];

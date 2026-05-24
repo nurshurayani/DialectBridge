@@ -21,7 +21,8 @@ import {
   MapPin,
   X,
   PlayCircle,
-  BarChart
+  BarChart,
+  Lock
 } from "lucide-react";
 import { 
   BarChart as RechartsBarChart, 
@@ -48,11 +49,43 @@ export default function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>(isSupabaseConfigured ? "auth" : "unconfigured");
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [userData, setUserData] = useState<any>(null);
-  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
+  
+  // Initialize community posts from cloud or fallback local guest posts
+  const [communityPosts, setCommunityPosts] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("dialect_bridge_guest_community_posts");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [session, setSession] = useState<any>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<Phrase[]>([]);
+
+  // Mastered phrases state to build completion on quiz performance
+  const [masteredPhraseIds, setMasteredPhraseIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("dialect_bridge_mastered_phrases");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("dialect_bridge_mastered_phrases", JSON.stringify(masteredPhraseIds));
+  }, [masteredPhraseIds]);
+
+  const [lastOpenedLessonId, setLastOpenedLessonId] = useState<string>(() => {
+    return localStorage.getItem("dialect_bridge_last_opened_lesson_id") || "l1";
+  });
+
+  const [hasSubmittedPost, setHasSubmittedPost] = useState<boolean>(() => {
+    return localStorage.getItem("dialect_bridge_submitted_post") === "true";
+  });
 
   const [guestUserData, setGuestUserData] = useState<any>(() => {
     const saved = localStorage.getItem("dialect_bridge_guest_user");
@@ -99,12 +132,26 @@ export default function App() {
     localStorage.setItem("dialect_bridge_completed_lessons", JSON.stringify(completedLessonIds));
   }, [completedLessonIds]);
 
+  // Compute calculated values based strictly on live mastered phrases to prevent resets
+  const calculatedCompletedLessonsCount = LESSONS.filter(lesson => {
+    const total = lesson.phrases.length;
+    return total > 0 && lesson.phrases.every(p => masteredPhraseIds.includes(p.id));
+  }).length;
+
   const activeUser = (session && userData) ? {
     ...userData,
-    completed_lesson_ids: completedLessonIds
+    completed_lesson_ids: completedLessonIds,
+    mastered_phrase_ids: masteredPhraseIds,
+    phrases_learned: masteredPhraseIds.length,
+    lessons_completed: calculatedCompletedLessonsCount,
+    has_submitted_post: hasSubmittedPost
   } : {
     ...guestUserData,
-    completed_lesson_ids: completedLessonIds
+    completed_lesson_ids: completedLessonIds,
+    mastered_phrase_ids: masteredPhraseIds,
+    phrases_learned: masteredPhraseIds.length,
+    lessons_completed: calculatedCompletedLessonsCount,
+    has_submitted_post: hasSubmittedPost
   };
 
   useEffect(() => {
@@ -274,28 +321,46 @@ export default function App() {
     }
     setActiveLesson(lesson);
     setCurrentScreen("lesson");
+    setLastOpenedLessonId(lesson.id);
+    localStorage.setItem("dialect_bridge_last_opened_lesson_id", lesson.id);
   };
 
-  const handleLessonComplete = async () => {
+  const handleLessonComplete = async (correctPhraseIdsThisSession: string[]) => {
     if (!activeLesson) {
       setCurrentScreen("explorer");
       return;
     }
 
     const lessonId = activeLesson.id;
-    setCompletedLessonIds(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+    
+    // Calculate new mastered list
+    const oldMasteredList = [...masteredPhraseIds];
+    const updatedMasteredList = Array.from(new Set([...oldMasteredList, ...correctPhraseIdsThisSession]));
+    
+    // Find net new phrases mastered
+    const newlyMasteredCount = correctPhraseIdsThisSession.filter(id => !oldMasteredList.includes(id)).length;
+    
+    // Calculate extra XP (e.g. 50 flat + 10 XP for each new mastered phrase)
+    const extraXp = 50 + (newlyMasteredCount * 10);
+    
+    // Update local mastered state
+    setMasteredPhraseIds(updatedMasteredList);
+
+    const isFullyCompletedNow = activeLesson.phrases.every(p => updatedMasteredList.includes(p.id));
+    if (isFullyCompletedNow) {
+      setCompletedLessonIds(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+    }
 
     const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
     const todayDayName = days[new Date().getDay()];
 
     const currentXp = activeUser.xp || 0;
-    const currentLessons = activeUser.lessons_completed || 0;
-    const incrementPhrases = activeLesson.phrases?.length || 8;
-    const currentPhrases = activeUser.phrases_learned || 0;
+    const updatedXp = currentXp + extraXp;
 
-    const updatedXp = currentXp + 50;
-    const updatedLessons = currentLessons + 1;
-    const updatedPhrases = currentPhrases + incrementPhrases;
+    const calculatedCompletedLessonsCount = LESSONS.filter(lesson => {
+      const total = lesson.phrases.length;
+      return total > 0 && lesson.phrases.every(p => updatedMasteredList.includes(p.id));
+    }).length;
 
     const currentActivity = activeUser.activity || [
       { day: "Mon", count: 0 },
@@ -313,17 +378,17 @@ export default function App() {
       return act;
     });
 
-    // Always persist to local memory first
+    // Save to guest state representing device memory
     setGuestUserData((prev: any) => ({
       ...prev,
       xp: updatedXp,
-      lessons_completed: updatedLessons,
-      phrases_learned: updatedPhrases,
+      lessons_completed: calculatedCompletedLessonsCount,
+      phrases_learned: updatedMasteredList.length,
       activity: updatedActivity
     }));
 
     if (!userData || !session) {
-      toast.success("Progress Saved to Local Memory! +50 XP");
+      toast.success(`Progress Saved to Local Memory! +${extraXp} XP`);
       setCurrentScreen("explorer");
       return;
     }
@@ -334,8 +399,8 @@ export default function App() {
         .from('profiles')
         .update({ 
           xp: updatedXp, 
-          lessons_completed: updatedLessons, 
-          phrases_learned: updatedPhrases,
+          lessons_completed: calculatedCompletedLessonsCount, 
+          phrases_learned: updatedMasteredList.length,
           activity: updatedActivity
         })
         .eq('id', session.user.id)
@@ -344,16 +409,16 @@ export default function App() {
 
       if (error) throw error;
       setUserData(data);
-      toast.success("Progress Saved to Heritage Cloud! +50 XP");
+      toast.success(`Progress Saved to Heritage Cloud! +${extraXp} XP`);
       setCurrentScreen("explorer");
     } catch (error) {
       console.error("Save error:", error);
-      toast.error("Failed to save progress, but wisdom is yours.");
+      toast.error("Cloud save failed, but your progress remains local.");
       setUserData((prev: any) => prev ? {
         ...prev,
         xp: updatedXp,
-        lessons_completed: updatedLessons,
-        phrases_learned: updatedPhrases,
+        lessons_completed: calculatedCompletedLessonsCount,
+        phrases_learned: updatedMasteredList.length,
         activity: updatedActivity
       } : null);
       setCurrentScreen("explorer");
@@ -363,29 +428,40 @@ export default function App() {
   };
 
   const handleNewPost = async (postData: any) => {
-    if (!session) return;
-    
     try {
       const newPost = {
+        id: postData.id || Date.now().toString(),
         phrase: postData.phrase,
         meaning: postData.meaning,
         dialect: postData.dialect,
-        origin: postData.origin,
-        note: postData.note,
-        user_id: session.user.id,
-        name: session.user.user_metadata?.username || session.user.email?.split('@')[0] || "Sabahan Spirit",
-        upvotes: 0
+        origin: postData.origin || "",
+        note: postData.note || "",
+        user_id: session?.user?.id || "guest",
+        name: session ? (session.user.user_metadata?.username || session.user.email?.split('@')[0]) : "You (Guest)",
+        upvotes: 0,
+        created_at: new Date().toISOString()
       };
 
-      const { data, error } = await supabase
-        .from('community_posts')
-        .insert([newPost])
-        .select()
-        .single();
+      if (session) {
+        const { data, error } = await supabase
+          .from('community_posts')
+          .insert([newPost])
+          .select()
+          .single();
 
-      if (error) throw error;
-      setCommunityPosts([data, ...communityPosts]);
-      toast.success("Phrase preserved in the community cloud!");
+        if (error) throw error;
+        setCommunityPosts([data, ...communityPosts]);
+        toast.success("Phrase preserved in the community cloud!");
+      } else {
+        // Safe Guest offline mode
+        const updatedPosts = [newPost, ...communityPosts];
+        setCommunityPosts(updatedPosts);
+        localStorage.setItem("dialect_bridge_guest_community_posts", JSON.stringify(updatedPosts));
+        toast.success("Phrase preserved locally on your device!");
+      }
+
+      setHasSubmittedPost(true);
+      localStorage.setItem("dialect_bridge_submitted_post", "true");
     } catch (error) {
       console.error("Submission error:", error);
       toast.error("Failed to share phrase");
@@ -517,10 +593,10 @@ export default function App() {
           )}>
             <AnimatePresence mode="wait">
               {currentScreen === "unconfigured" && (
-                <UnconfiguredScreen key="unconfigured" />
+                <UnconfiguredScreen key="unconfigured" onSkip={() => setCurrentScreen("home")} />
               )}
               {currentScreen === "auth" && (
-                <AuthScreen key="auth" />
+                <AuthScreen key="auth" onSkip={() => setCurrentScreen("home")} />
               )}
               {currentScreen === "home" && (
                 <HomeScreen 
@@ -535,12 +611,21 @@ export default function App() {
                   }} 
                   favourites={favourites}
                   onToggleFavourite={toggleFavourite}
+                  masteredPhraseIds={masteredPhraseIds}
+                  lastOpenedLessonId={lastOpenedLessonId}
+                  onResumeLesson={(lessonId) => {
+                    const matchingLesson = LESSONS.find(l => l.id === lessonId);
+                    if (matchingLesson) {
+                      handleStartLesson(matchingLesson);
+                    }
+                  }}
                 />
               )}
               {currentScreen === "explorer" && (
                 <ExplorerScreen 
                   onStartLesson={handleStartLesson} 
                   completedLessonIds={completedLessonIds}
+                  masteredPhraseIds={masteredPhraseIds}
                 />
               )}
               {currentScreen === "community" && (
@@ -554,6 +639,8 @@ export default function App() {
                   user={activeUser} 
                   favourites={favourites}
                   onToggleFavourite={toggleFavourite}
+                  masteredPhraseIds={masteredPhraseIds}
+                  hasSubmittedPost={hasSubmittedPost}
                 />
               )}
               {currentScreen === "dictionary" && (
@@ -565,6 +652,10 @@ export default function App() {
                   lesson={activeLesson} 
                   onComplete={handleLessonComplete}
                   onExit={() => setCurrentScreen("explorer")}
+                  masteredPhraseIds={masteredPhraseIds}
+                  onPhraseMastered={(phraseId) => {
+                    setMasteredPhraseIds(prev => prev.includes(phraseId) ? prev : [...prev, phraseId]);
+                  }}
                 />
               )}
             </AnimatePresence>
@@ -610,9 +701,9 @@ function NavButton({ icon, active, onClick }: { icon: React.ReactNode, active: b
   );
 }
 
-function UnconfiguredScreen() {
+function UnconfiguredScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-brand-warm-white">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-brand-warm-white" key={key}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
@@ -634,13 +725,24 @@ function UnconfiguredScreen() {
             <li>Refresh the application</li>
           </ol>
         </div>
-        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Connect to Supabase to save your heritage progress.</p>
+        
+        {onSkip && (
+          <button 
+            type="button"
+            onClick={onSkip}
+            className="w-full bg-brand-green text-white py-5 rounded-3xl font-black text-lg shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4 flex items-center justify-center gap-3"
+          >
+            Continue as Guest (Offline Mode) →
+          </button>
+        )}
+        
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest pt-2">Connect to Supabase to save your heritage progress.</p>
       </motion.div>
     </div>
   );
 }
 
-function AuthScreen() {
+function AuthScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -738,6 +840,16 @@ function AuthScreen() {
           {isSignUp ? "Already a guardian? Sign In" : "New descendant? Create Identity"}
         </button>
 
+        {onSkip && (
+          <button 
+            type="button"
+            onClick={onSkip}
+            className="w-full mt-4 bg-brand-green/10 text-brand-green py-5 rounded-[2rem] font-black text-lg hover:bg-brand-green/20 transition-all text-center flex items-center justify-center gap-2 border border-brand-green/20"
+          >
+            <span>Continue as Guest (Local Memory)</span> <span>→</span>
+          </button>
+        )}
+
         <div className="mt-8 pt-8 border-t border-brand-green/5 text-center">
           <p className="text-[9px] uppercase font-black text-gray-300 tracking-[0.2em] leading-relaxed">
             Prototype Demo: No email verification required if "Confirm Email" is disabled in Supabase.
@@ -748,9 +860,23 @@ function AuthScreen() {
   );
 }
 
-// --- SCREEN COMPONENTS ---
-
-function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user: any, onContinue: (category?: string) => void, favourites: Phrase[], onToggleFavourite: (phrase: Phrase) => void }) {
+function HomeScreen({ 
+  user, 
+  onContinue, 
+  favourites, 
+  onToggleFavourite,
+  masteredPhraseIds = [],
+  lastOpenedLessonId = "l1",
+  onResumeLesson
+}: { 
+  user: any, 
+  onContinue: (category?: string) => void, 
+  favourites: Phrase[], 
+  onToggleFavourite: (phrase: Phrase) => void,
+  masteredPhraseIds?: string[],
+  lastOpenedLessonId?: string,
+  onResumeLesson: (lessonId: string) => void
+}) {
   const defaultUser = {
     phrases_learned: 0,
     xp: 0,
@@ -782,6 +908,14 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
     return DICTIONARY[index];
   });
   const isStarred = favourites.some(p => p.id === dailyPhrase.id);
+
+  // Math calculation of progress for the last opened lesson
+  const lastLesson = LESSONS.find(l => l.id === lastOpenedLessonId) || LESSONS[0];
+  const totalPhrasesInLastLesson = lastLesson.phrases.length;
+  const masteredInLastLesson = lastLesson.phrases.filter(p => masteredPhraseIds.includes(p.id)).length;
+  const lastLessonProgressPercent = totalPhrasesInLastLesson > 0 
+    ? Math.round((masteredInLastLesson / totalPhrasesInLastLesson) * 100) 
+    : 0;
 
   return (
     <motion.div 
@@ -848,25 +982,63 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
 
       {/* Stats and Activity Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        <div className="lg:col-span-8 bg-white p-10 rounded-[3.5rem] border border-brand-green/10 card-shadow group">
-          <h4 className="font-bold mb-10 flex items-center gap-3 text-deep-forest text-2xl">
-            <span className="text-3xl grayscale group-hover:grayscale-0 transition-all animate-bounce">📈</span> Recent Activity
-          </h4>
-          <div className="flex gap-4 items-end h-32 mb-6">
-            {activeUser.activity?.map((entry: any, i: number) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-3 group/bar">
-                <div 
-                  className={cn(
-                    "w-full rounded-2xl transition-all duration-700 ease-out shadow-sm",
-                    (entry.count || 0) > 15 ? "bg-brand-green shadow-brand-green/20" : (entry.count || 0) > 0 ? "bg-accent-sand/40 border border-accent-sand/20" : "bg-gray-100/50"
-                  )}
-                  style={{ height: `${Math.max((entry.count || 0) * 3, 10)}%` }}
-                />
-                <span className="text-[10px] font-black text-deep-forest/30 uppercase tracking-widest">{entry.day}</span>
+        {/* Continue Your Journey Card */}
+        <div className="lg:col-span-8 bg-white p-10 rounded-[3.5rem] border border-brand-green/10 card-shadow flex flex-col justify-between group">
+          <div className="space-y-6">
+            <h4 className="font-extrabold flex items-center gap-3 text-deep-forest text-2xl">
+              <span className="text-3xl animate-pulse">🧭</span> Continue Your Journey
+            </h4>
+            <p className="text-sm font-medium text-deep-forest/50 italic">
+              "Every word learned strengthens the bridge between generations."
+            </p>
+            
+            <div className="p-8 bg-brand-warm-white rounded-[2rem] border border-brand-green/5 space-y-6 mt-4">
+              <div className="flex justify-between items-center">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-brand-green text-3xl shadow-sm ring-4 ring-soft-green/50">
+                    {lastLesson.icon === "Hand" && "👋"}
+                    {lastLesson.icon === "Users" && "👥"}
+                    {lastLesson.icon === "User" && "👤"}
+                    {lastLesson.icon === "Paintbrush" && "🎨"}
+                    {lastLesson.icon === "Smile" && "😊"}
+                    {lastLesson.icon === "Utensils" && "🍴"}
+                    {lastLesson.icon === "Trees" && "🌲"}
+                    {lastLesson.icon === "Sparkles" && "✨"}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-brand-green opacity-40 tracking-widest leading-none block">Last Opened Lesson</span>
+                    <span className="text-xl font-black text-brand-green mt-1 underline decoration-accent-sand decoration-2 block">{lastLesson.title}</span>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <span className="text-brand-green text-2xl font-black">{lastLessonProgressPercent}%</span>
+                  <p className="text-[9px] font-black text-deep-forest/40 uppercase tracking-widest mt-1">Mastery</p>
+                </div>
               </div>
-            ))}
+
+              {/* Progress bar */}
+              <div className="h-4 bg-white rounded-full overflow-hidden border border-brand-green/5 p-[2px] shadow-inner relative">
+                <motion.div 
+                  initial={{ width: 0 }}
+                  animate={{ width: `${lastLessonProgressPercent}%` }}
+                  className="h-full bg-brand-green rounded-full shadow-[0_0_8px_rgba(45,106,79,0.3)]"
+                  style={{ backgroundColor: "#2D6A4F" }}
+                />
+              </div>
+
+              <div className="flex justify-between items-center text-xs font-black text-deep-forest/40 uppercase tracking-widest pt-1">
+                <span>{masteredInLastLesson} / {totalPhrasesInLastLesson} Phrases Mastered</span>
+                {lastLessonProgressPercent === 100 && <span className="text-amber-600 flex items-center gap-1">🌟 Golden Mastery</span>}
+              </div>
+            </div>
           </div>
-          <p className="text-xs text-center text-gray-400 font-bold uppercase tracking-[0.2em] pt-4">Weekly progress calibration</p>
+
+          <button 
+            onClick={() => onResumeLesson(lastLesson.id)}
+            className="w-full bg-deep-forest text-white py-5 rounded-[2rem] font-black text-xl hover:brightness-110 shadow-xl mt-8 transition-all active:scale-[0.98] flex items-center justify-center gap-3 animate-pulse hover:animate-none"
+          >
+            Resume Lesson <ArrowRight size={20} />
+          </button>
         </div>
         
         <div className="lg:col-span-4 bg-white p-10 rounded-[3.5rem] border border-brand-green/10 card-shadow flex flex-col justify-between relative overflow-hidden">
@@ -900,7 +1072,15 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
   );
 }
 
-function ExplorerScreen({ onStartLesson, completedLessonIds = [] }: { onStartLesson: (lesson: Lesson) => void, completedLessonIds?: string[] }) {
+function ExplorerScreen({ 
+  onStartLesson, 
+  completedLessonIds = [],
+  masteredPhraseIds = []
+}: { 
+  onStartLesson: (lesson: Lesson) => void, 
+  completedLessonIds?: string[],
+  masteredPhraseIds?: string[]
+}) {
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -915,8 +1095,10 @@ function ExplorerScreen({ onStartLesson, completedLessonIds = [] }: { onStartLes
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         {LESSONS.map((lesson) => {
-          const isCompleted = completedLessonIds.includes(lesson.id) || lesson.id === "l1"; // Greetings is completed by default
-          const progress = isCompleted ? 100 : lesson.progress;
+          const totalPhrases = lesson.phrases.length;
+          const masteredCount = lesson.phrases.filter(p => masteredPhraseIds.includes(p.id)).length;
+          const progress = totalPhrases > 0 ? Math.round((masteredCount / totalPhrases) * 100) : 0;
+          const isCompleted = progress === 100;
 
           return (
             <button 
@@ -926,7 +1108,7 @@ function ExplorerScreen({ onStartLesson, completedLessonIds = [] }: { onStartLes
             >
               {isCompleted && (
                 <div className="absolute top-8 right-8">
-                  <CheckCircle className="text-brand-green fill-soft-green" size={32} />
+                  <CheckCircle className="text-brand-green fill-soft-green animate-bounce" size={32} />
                 </div>
               )}
               <div className="flex items-center gap-6 mb-10">
@@ -949,6 +1131,7 @@ function ExplorerScreen({ onStartLesson, completedLessonIds = [] }: { onStartLes
                     initial={{ width: 0 }}
                     animate={{ width: `${progress}%` }}
                     className="h-full bg-brand-green rounded-full shadow-[0_0_12px_rgba(45,106,79,0.3)]"
+                    style={{ backgroundColor: "#2D6A4F" }}
                   />
                 </div>
               </div>
@@ -960,10 +1143,25 @@ function ExplorerScreen({ onStartLesson, completedLessonIds = [] }: { onStartLes
   );
 }
 
-function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComplete: () => void, onExit: () => void, key?: string }) {
+function LessonScreen({ 
+  lesson, 
+  onComplete, 
+  onExit,
+  masteredPhraseIds = [],
+  onPhraseMastered
+}: { 
+  lesson: Lesson, 
+  onComplete: (correctPhraseIds: string[]) => void, 
+  onExit: () => void, 
+  masteredPhraseIds?: string[],
+  onPhraseMastered?: (phraseId: string) => void,
+  key?: string 
+}) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isRevealed, setIsRevealed] = useState(false);
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
+  const [wrongOptions, setWrongOptions] = useState<string[]>([]);
+  const [correctPhraseIdsThisSession, setCorrectPhraseIdsThisSession] = useState<string[]>([]);
   const [mode, setMode] = useState<"learning" | "quiz">("learning");
   const [quizType, setQuizType] = useState<"kto_bm" | "kto_en" | "bmto_k" | "ento_k">("kto_bm");
 
@@ -1054,12 +1252,23 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   }, [currentIndex, currentPhrase, mode, quizType, lesson]);
 
   const handleOptionClick = (option: { text: string, correct: boolean }) => {
-    if (selectedOption) return;
-    setSelectedOption(option.text);
+    if (selectedOption !== null) return; // already solved this question
+
     if (option.correct) {
+      setSelectedOption(option.text);
       toast.success("Tepat sekali! Your ancestors are proud.");
+      
+      const phraseId = currentPhrase.id;
+      // Triggers mastered state update cleanly
+      if (!correctPhraseIdsThisSession.includes(phraseId)) {
+        setCorrectPhraseIdsThisSession(prev => [...prev, phraseId]);
+        if (onPhraseMastered) {
+          onPhraseMastered(phraseId);
+        }
+      }
     } else {
-      toast.error("Almost there. The bridge falters.");
+      toast.error("Almost there. Try again!");
+      setWrongOptions(prev => prev.includes(option.text) ? prev : [...prev, option.text]);
     }
   };
 
@@ -1072,15 +1281,17 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
         setMode("quiz");
         setCurrentIndex(0);
         setSelectedOption(null);
+        setWrongOptions([]);
         setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
       }
     } else {
       if (currentIndex < lesson.phrases.length - 1) {
         setCurrentIndex(currentIndex + 1);
         setSelectedOption(null);
+        setWrongOptions([]);
         setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
       } else {
-        onComplete();
+        onComplete(correctPhraseIdsThisSession); // Pass mastered phrases cleanly
       }
     }
   };
@@ -1090,6 +1301,7 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
       if (currentIndex > 0) {
         setCurrentIndex(currentIndex - 1);
         setSelectedOption(null);
+        setWrongOptions([]);
       } else {
         setMode("learning");
         setCurrentIndex(lesson.phrases.length - 1);
@@ -1224,21 +1436,29 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {options.map((opt) => (
-                <button
-                  key={opt.text}
-                  disabled={selectedOption !== null}
-                  onClick={() => handleOptionClick(opt)}
-                  className={cn(
-                    "p-6 rounded-[2rem] border-4 text-left transition-all font-black text-xl md:text-2xl shadow-sm",
-                    selectedOption === opt.text
-                      ? (opt.correct ? "bg-green-600 border-green-800 text-white shadow-2xl scale-[1.03] -translate-y-1" : "bg-red-500 border-red-700 text-white opacity-90")
-                      : "bg-brand-warm-white border-transparent hover:border-accent-sand/30 text-deep-forest hover:bg-soft-green hover:scale-[1.01]"
-                  )}
-                >
-                  {opt.text}
-                </button>
-              ))}
+              {options.map((opt) => {
+                const hasMatchedCorrect = selectedOption !== null;
+                const isSelectedCorrect = hasMatchedCorrect && opt.correct;
+                const isSelectedWrong = wrongOptions.includes(opt.text);
+
+                return (
+                  <button
+                    key={opt.text}
+                    disabled={hasMatchedCorrect}
+                    onClick={() => handleOptionClick(opt)}
+                    className={cn(
+                      "p-6 rounded-[2rem] border-4 text-left transition-all font-black text-xl md:text-2xl shadow-sm",
+                      isSelectedCorrect
+                        ? "bg-green-600 border-green-800 text-white shadow-2xl scale-[1.03] -translate-y-1"
+                        : (isSelectedWrong
+                          ? "bg-red-500 border-red-700 text-white opacity-80 scale-95 cursor-not-allowed"
+                          : "bg-brand-warm-white border-transparent hover:border-accent-sand/30 text-deep-forest hover:bg-soft-green hover:scale-[1.01]")
+                    )}
+                  >
+                    {opt.text}
+                  </button>
+                );
+              })}
             </div>
           </motion.section>
         )}
@@ -1441,12 +1661,22 @@ function CommunityScreen({ posts, onNewPost }: { posts: any[], onNewPost: (post:
     </motion.div>
   );
 }
-function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, favourites: Phrase[], onToggleFavourite: (phrase: Phrase) => void }) {
+function ProfileScreen({ 
+  user, 
+  favourites, 
+  onToggleFavourite,
+  masteredPhraseIds = [],
+  hasSubmittedPost = false
+}: { 
+  user: any, 
+  favourites: Phrase[], 
+  onToggleFavourite: (phrase: Phrase) => void,
+  masteredPhraseIds?: string[],
+  hasSubmittedPost?: boolean
+}) {
   const defaultUser = {
     streak: 0,
     xp: 0,
-    lessons_completed: 0,
-    phrases_learned: 0,
     activity: [
       { day: "Mon", count: 0 },
       { day: "Tue", count: 0 },
@@ -1455,12 +1685,93 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
       { day: "Fri", count: 0 },
       { day: "Sat", count: 0 },
       { day: "Sun", count: 0 },
-    ],
-    achievements: [
-      { id: "1", name: "First Steps", icon: "CheckCircle", description: "Joined the bridge" }
     ]
   };
   const activeUser = user || defaultUser;
+
+  // 1. Definition of the 8 required categories
+  const categoriesList = [
+    { name: "Greetings", id: "l1" },
+    { name: "Family", id: "l2" },
+    { name: "Numbers", id: "l4" },
+    { name: "Colours", id: "l3" },
+    { name: "Body Parts", id: "l5" },
+    { name: "Food", id: "l9" },
+    { name: "Nature", id: "l10" },
+    { name: "Celebrations", id: "l11" }
+  ];
+
+  // 2. Map progress calculation for each category
+  const categoryProgressMap = categoriesList.map((cat) => {
+    const matchingLesson = LESSONS.find(l => l.id === cat.id || l.title === cat.name);
+    const totalPhrases = matchingLesson ? matchingLesson.phrases.length : 8;
+    const completedPhrases = matchingLesson 
+      ? matchingLesson.phrases.filter(p => masteredPhraseIds.includes(p.id)).length 
+      : 0;
+    const percent = totalPhrases > 0 ? Math.round((completedPhrases / totalPhrases) * 100) : 0;
+    return { 
+      ...cat, 
+      totalPhrases, 
+      completedPhrases, 
+      percent, 
+      isCompleted: percent === 100 
+    };
+  });
+
+  // 3. Derived Metrics based on true progress state
+  const completedLessonsCount = categoryProgressMap.filter(c => c.isCompleted).length;
+  const wordsLearnedCount = masteredPhraseIds.length;
+  const currentStreak = activeUser.streak || 0;
+  const coloursLessonComplete = categoryProgressMap.find(c => c.name === "Colours")?.isCompleted || false;
+  const allCategoriesComplete = completedLessonsCount >= 8;
+  const isWisdomSharer = hasSubmittedPost || false;
+
+  // 4. Achievement Badges List (Exactly 6 specified badges)
+  const badges = [
+    {
+      id: "badge-first-step",
+      name: "First Step",
+      description: "Complete 1 full lesson of your heritage",
+      unlocked: completedLessonsCount >= 1,
+      icon: "🌱"
+    },
+    {
+      id: "badge-word-collector",
+      name: "Word Collector",
+      description: "Secure 15 words in your local memory",
+      unlocked: wordsLearnedCount >= 15,
+      icon: "📚"
+    },
+    {
+      id: "badge-7-day-streak",
+      name: "7-Day Streak",
+      description: "Maintain a sacred 7-day memory streak",
+      unlocked: currentStreak >= 7,
+      icon: "🔥"
+    },
+    {
+      id: "badge-colour-master",
+      name: "Colour Master",
+      description: "Master all Sabah colours (100% Colours)",
+      unlocked: coloursLessonComplete,
+      icon: "🎨"
+    },
+    {
+      id: "badge-heritage-guardian",
+      name: "Heritage Guardian",
+      description: "Restore all 8 categories to golden mastery",
+      unlocked: allCategoriesComplete,
+      icon: "🛡️"
+    },
+    {
+      id: "badge-wisdom-sharer",
+      name: "Wisdom Sharer",
+      description: "Submit a custom ancestral phrase to Community Hub",
+      unlocked: isWisdomSharer,
+      icon: "💬"
+    }
+  ];
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
@@ -1480,7 +1791,7 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
           <p className="text-deep-forest/40 font-bold text-xl italic font-cultural leading-tight">"A descendant reclaiming what was once unheard."</p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-8">
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
-              <Flame size={22} className="text-orange-500 animate-pulse" /> {activeUser.streak || 0} Day Streak
+              <Flame size={22} className="text-orange-500 animate-pulse" /> {currentStreak} Day Streak
             </span>
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
               <Trophy size={22} className="text-accent-sand" /> {activeUser.xp || 0} XP Points
@@ -1498,7 +1809,7 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
       {/* Favourites Section */}
       <section className="bg-white p-12 rounded-[4rem] border border-brand-green/10 shadow-sm space-y-10 card-shadow">
         <h3 className="text-3xl font-black text-deep-forest flex items-center gap-4">
-          <span className="text-accent-sand text-4xl">⭐</span> Ancestral Favourites
+          <span className="text-accent-sand text-4xl">⭐</span> Preserved Favourites
         </h3>
         
         {favourites.length === 0 ? (
@@ -1533,7 +1844,7 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
         )}
       </section>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         {/* Lessons Progress Card */}
         <div className="bg-white p-12 rounded-[4rem] border border-brand-green/10 shadow-sm space-y-10 card-shadow relative overflow-hidden group">
           <div className="absolute top-10 right-10 text-brand-green/5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1544,44 +1855,29 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
           </h3>
           
           <div className="space-y-8">
-            {[
-              { name: "Greetings", id: "l1" },
-              { name: "Family", id: "l2" },
-              { name: "Numbers", id: "l4" },
-              { name: "Colours", id: "l3" },
-              { name: "Body Parts", id: "l5" },
-              { name: "Food", id: "l9" },
-              { name: "Nature", id: "l10" },
-              { name: "Celebrations", id: "l11" }
-            ].map((cat) => {
-              const isCompleted = activeUser.completed_lesson_ids?.includes(cat.id) || cat.id === "l1";
-              const matchingLesson = LESSONS.find(l => l.category === cat.name || l.title === cat.name);
-              const totalPhrases = matchingLesson ? matchingLesson.phrases.length : 8;
-              const completedPhrases = isCompleted ? totalPhrases : 0;
-              const percent = Math.round((completedPhrases / totalPhrases) * 100);
-
+            {categoryProgressMap.map((cat) => {
               return (
                 <div key={cat.name} className="space-y-3">
                   <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                       <span className="font-black text-xl text-deep-forest">{cat.name}</span>
-                      {isCompleted && (
+                      {cat.isCompleted && (
                         <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black border border-amber-300 flex items-center gap-1.5 shadow-sm">
-                          <CheckCircle size={12} className="text-amber-600 fill-amber-100" />
-                          100% Complete
+                          <span className="text-amber-500">🏆</span>
+                          <span>Complete</span>
                         </span>
                       )}
                     </div>
-                    <span className="text-xs font-black text-deep-forest/40 uppercase tracking-widest">
-                      {completedPhrases} / {totalPhrases} phrases
+                    <span className="text-xs font-black text-deep-forest/40 uppercase tracking-widest block">
+                      {cat.completedPhrases} / {cat.totalPhrases} phrases
                     </span>
                   </div>
                   
                   {/* Progress Bar Container */}
-                  <div className="h-4 bg-brand-warm-white rounded-full overflow-hidden border border-brand-green/5 p-[2px] shadow-inner relative">
+                  <div className="h-4 bg-brand-warm-white rounded-full overflow-hidden border border-brand-green/5 p-[2px] shadow-inner relative flex items-center">
                     <motion.div 
                       initial={{ width: 0 }}
-                      animate={{ width: `${percent}%` }}
+                      animate={{ width: `${cat.percent}%` }}
                       className="h-full bg-brand-green rounded-full shadow-[0_0_12px_rgba(45,106,79,0.3)]"
                       style={{ backgroundColor: "#2D6A4F" }}
                     />
@@ -1592,31 +1888,56 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
           </div>
         </div>
 
-        {/* Achievement Badges */}
+        {/* Dynamic Achievements Badges Section */}
         <div className="bg-white p-12 rounded-[4rem] border border-brand-green/10 shadow-sm space-y-10 card-shadow overflow-hidden relative">
-           <div className="absolute bottom-[-50px] left-[-50px] opacity-5 text-accent-sand">
-             <Trophy size={150} />
-           </div>
+          <div className="absolute bottom-[-50px] left-[-50px] opacity-5 text-accent-sand">
+            <Trophy size={150} />
+          </div>
           <h3 className="text-3xl font-black text-deep-forest relative z-10">Sacred Badges</h3>
-          <div className="grid grid-cols-2 gap-8 relative z-10">
-            {(activeUser.achievements || []).map((ach: any) => (
-              <div key={ach.id} className="p-8 bg-brand-warm-white rounded-[2.5rem] flex flex-col items-center text-center gap-4 group border border-brand-green/5 hover:border-brand-green/20 hover:-translate-y-2 transition-all shadow-sm hover:shadow-xl">
-                <div className="w-20 h-20 bg-white rounded-3xl flex items-center justify-center text-brand-green shadow-xl group-hover:scale-125 group-hover:rotate-12 transition-all ring-8 ring-soft-green">
-                  {ach.icon === "CheckCircle" && <CheckCircle size={40} strokeWidth={2.5} />}
-                  {ach.icon === "Flame" && <Flame size={40} strokeWidth={2.5} className="text-orange-500 animate-pulse" />}
+          
+          <div className="grid grid-cols-2 gap-6 relative z-10">
+            {badges.map((b) => (
+              <div 
+                key={b.id} 
+                className={cn(
+                  "p-8 rounded-[2.5rem] flex flex-col items-center text-center gap-4 border transition-all shadow-sm hover:shadow-xl hover:-translate-y-1 relative",
+                  b.unlocked 
+                    ? "bg-white border-brand-green/20" 
+                    : "bg-gray-55 border-gray-100 opacity-60"
+                )}
+              >
+                <div 
+                  className={cn(
+                    "w-20 h-20 rounded-3xl flex items-center justify-center text-4xl shadow-md transition-transform relative",
+                    b.unlocked 
+                      ? "bg-soft-green ring-8 ring-soft-green/50 animate-pulse text-brand-green" 
+                      : "bg-gray-200 text-gray-400"
+                  )}
+                >
+                  <span>{b.icon}</span>
+                  
+                  {/* Badge Unlocked Status Checkmark or Lock */}
+                  {b.unlocked ? (
+                    <div className="absolute -bottom-1 -right-1 bg-brand-green text-white w-6 h-6 rounded-full flex items-center justify-center text-[10px] border-2 border-white shadow-md">
+                      ✓
+                    </div>
+                  ) : (
+                    <div className="absolute -bottom-1 -right-1 bg-gray-400 text-white w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                      <Lock size={10} className="stroke-[3]" />
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <p className="text-sm font-black text-deep-forest leading-tight uppercase tracking-tight">{ach.name}</p>
-                  <p className="text-xs text-gray-400 italic mt-2 font-cultural leading-relaxed">"{ach.description}"</p>
+                
+                <div className="space-y-1">
+                  <p className={cn("text-base font-black leading-tight tracking-tight", b.unlocked ? "text-brand-green" : "text-gray-500")}>
+                    {b.name}
+                  </p>
+                  <p className="text-[10px] text-gray-400 font-bold leading-relaxed">
+                    {b.description}
+                  </p>
                 </div>
               </div>
             ))}
-            <div className="p-8 bg-gray-50/50 border-2 border-dashed border-gray-200 rounded-[2.5rem] flex flex-col items-center justify-center opacity-30 group cursor-not-allowed" title="Master more lessons to unlock">
-              <div className="w-14 h-14 bg-white/50 rounded-[1.5rem] flex items-center justify-center text-gray-300 group-hover:shake transition-all underline decoration-accent-sand/20">
-                <Library size={32} />
-              </div>
-              <p className="text-[10px] font-black mt-4 text-gray-400 tracking-[0.3em] uppercase">Locked</p>
-            </div>
           </div>
         </div>
       </div>
@@ -1627,11 +1948,11 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
           <div className="w-full h-full pattern-bg"></div>
         </div>
         <div className="space-y-4 relative z-10">
-          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{activeUser.lessons_completed || 0}</p>
+          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{completedLessonsCount}</p>
           <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-l-4 border-accent-sand/40 pl-4">Lessons Transmitted</p>
         </div>
         <div className="space-y-4 relative z-10 text-right">
-          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{activeUser.phrases_learned || 0}</p>
+          <p className="text-7xl md:text-9xl font-black tracking-tighter text-accent-sand drop-shadow-2xl leading-none">{wordsLearnedCount}</p>
           <p className="text-xs md:text-sm font-black uppercase tracking-[0.4em] text-white/40 border-r-4 border-accent-sand/40 pr-4">Words Learned</p>
         </div>
       </div>
@@ -1644,7 +1965,7 @@ function DictionaryScreen() {
   const [filter, setFilter] = useState("All");
   const [categoryFilter, setCategoryFilter] = useState("All");
 
-  const categories = ["All", "Greetings", "Family", "Numbers", "Colours", "Body Parts", "Food", "Nature"];
+  const categories = ["All", "Greetings", "Family", "Numbers", "Colours", "Body Parts", "Food", "Nature", "Celebrations"];
 
   const sortedDictionary = React.useMemo(() => {
     return [...DICTIONARY].sort((a, b) => a.phrase.localeCompare(b.phrase));
