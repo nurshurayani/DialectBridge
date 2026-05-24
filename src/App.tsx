@@ -54,6 +54,59 @@ export default function App() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<Phrase[]>([]);
 
+  const [guestUserData, setGuestUserData] = useState<any>(() => {
+    const saved = localStorage.getItem("dialect_bridge_guest_user");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback
+      }
+    }
+    return {
+      xp: 0,
+      phrases_learned: 0,
+      lessons_completed: 0,
+      activity: [
+        { day: "Mon", count: 0 },
+        { day: "Tue", count: 0 },
+        { day: "Wed", count: 0 },
+        { day: "Thu", count: 0 },
+        { day: "Fri", count: 0 },
+        { day: "Sat", count: 0 },
+        { day: "Sun", count: 0 },
+      ]
+    };
+  });
+
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem("dialect_bridge_completed_lessons");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        return [];
+      }
+    }
+    return [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("dialect_bridge_guest_user", JSON.stringify(guestUserData));
+  }, [guestUserData]);
+
+  useEffect(() => {
+    localStorage.setItem("dialect_bridge_completed_lessons", JSON.stringify(completedLessonIds));
+  }, [completedLessonIds]);
+
+  const activeUser = (session && userData) ? {
+    ...userData,
+    completed_lesson_ids: completedLessonIds
+  } : {
+    ...guestUserData,
+    completed_lesson_ids: completedLessonIds
+  };
+
   useEffect(() => {
     const stored = localStorage.getItem("dialect_bridge_favourites");
     if (stored) {
@@ -206,24 +259,64 @@ export default function App() {
   };
 
   const handleLessonComplete = async () => {
-    if (!userData || !session) {
-      toast.success("Progress Reclaimed! +50 XP");
+    if (!activeLesson) {
       setCurrentScreen("explorer");
       return;
     }
-    
+
+    const lessonId = activeLesson.id;
+    setCompletedLessonIds(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
+
+    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const todayDayName = days[new Date().getDay()];
+
+    const currentXp = activeUser.xp || 0;
+    const currentLessons = activeUser.lessons_completed || 0;
+    const incrementPhrases = activeLesson.phrases?.length || 8;
+    const currentPhrases = activeUser.phrases_learned || 0;
+
+    const updatedXp = currentXp + 50;
+    const updatedLessons = currentLessons + 1;
+    const updatedPhrases = currentPhrases + incrementPhrases;
+
+    const currentActivity = activeUser.activity || [
+      { day: "Mon", count: 0 },
+      { day: "Tue", count: 0 },
+      { day: "Wed", count: 0 },
+      { day: "Thu", count: 0 },
+      { day: "Fri", count: 0 },
+      { day: "Sat", count: 0 },
+      { day: "Sun", count: 0 },
+    ];
+    const updatedActivity = currentActivity.map((act: any) => {
+      if (act.day === todayDayName) {
+        return { ...act, count: (act.count || 0) + 20 };
+      }
+      return act;
+    });
+
+    if (!userData || !session) {
+      setGuestUserData((prev: any) => ({
+        ...prev,
+        xp: updatedXp,
+        lessons_completed: updatedLessons,
+        phrases_learned: updatedPhrases,
+        activity: updatedActivity
+      }));
+      toast.success("Progress Saved to Local Memory! +50 XP");
+      setCurrentScreen("explorer");
+      return;
+    }
+
     try {
       setLoading(true);
-      const updatedXp = (userData.xp || 0) + 50;
-      const updatedLessons = (userData.lessons_completed || 0) + 1;
-      const updatedPhrases = (userData.phrases_learned || (userData.phrases_learned === 0 ? 0 : 0)) + 8;
-      
       const { data, error } = await supabase
         .from('profiles')
         .update({ 
           xp: updatedXp, 
           lessons_completed: updatedLessons, 
-          phrases_learned: updatedPhrases 
+          phrases_learned: updatedPhrases,
+          activity: updatedActivity
         })
         .eq('id', session.user.id)
         .select()
@@ -236,6 +329,13 @@ export default function App() {
     } catch (error) {
       console.error("Save error:", error);
       toast.error("Failed to save progress, but wisdom is yours.");
+      setUserData((prev: any) => prev ? {
+        ...prev,
+        xp: updatedXp,
+        lessons_completed: updatedLessons,
+        phrases_learned: updatedPhrases,
+        activity: updatedActivity
+      } : null);
       setCurrentScreen("explorer");
     } finally {
       setLoading(false);
@@ -404,8 +504,15 @@ export default function App() {
               )}
               {currentScreen === "home" && (
                 <HomeScreen 
-                  user={userData} 
-                  onContinue={() => setCurrentScreen("explorer")} 
+                  user={activeUser} 
+                  onContinue={(category?: string) => {
+                    const matchingLesson = LESSONS.find(l => l.category === category);
+                    if (matchingLesson) {
+                      handleStartLesson(matchingLesson);
+                    } else {
+                      setCurrentScreen("explorer");
+                    }
+                  }} 
                   favourites={favourites}
                   onToggleFavourite={toggleFavourite}
                 />
@@ -413,6 +520,7 @@ export default function App() {
               {currentScreen === "explorer" && (
                 <ExplorerScreen 
                   onStartLesson={handleStartLesson} 
+                  completedLessonIds={completedLessonIds}
                 />
               )}
               {currentScreen === "community" && (
@@ -423,7 +531,7 @@ export default function App() {
               )}
               {currentScreen === "profile" && (
                 <ProfileScreen 
-                  user={userData} 
+                  user={activeUser} 
                   favourites={favourites}
                   onToggleFavourite={toggleFavourite}
                 />
@@ -622,7 +730,7 @@ function AuthScreen() {
 
 // --- SCREEN COMPONENTS ---
 
-function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user: any, onContinue: () => void, favourites: Phrase[], onToggleFavourite: (phrase: Phrase) => void }) {
+function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user: any, onContinue: (category?: string) => void, favourites: Phrase[], onToggleFavourite: (phrase: Phrase) => void }) {
   const defaultUser = {
     phrases_learned: 0,
     xp: 0,
@@ -639,8 +747,10 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
   const activeUser = user || defaultUser;
   const [dailyPhrase] = useState(() => {
     if (!DICTIONARY || DICTIONARY.length === 0) return LESSONS[0].phrases[0];
-    const randomIndex = Math.floor(Math.random() * DICTIONARY.length);
-    return DICTIONARY[randomIndex];
+    const today = new Date();
+    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const index = seed % DICTIONARY.length;
+    return DICTIONARY[index];
   });
   const isStarred = favourites.some(p => p.id === dailyPhrase.id);
 
@@ -686,7 +796,7 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
             </div>
 
             <button 
-              onClick={onContinue}
+              onClick={() => onContinue(dailyPhrase.category)}
               className="w-full bg-brand-green text-white py-6 rounded-[2rem] font-black text-2xl hover:brightness-110 shadow-2xl shadow-brand-green/30 transition-all active:scale-[0.98] flex items-center justify-center gap-4"
             >
               Master This Phrase <ArrowRight />
@@ -761,7 +871,7 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
   );
 }
 
-function ExplorerScreen({ onStartLesson }: { onStartLesson: (lesson: Lesson) => void }) {
+function ExplorerScreen({ onStartLesson, completedLessonIds = [] }: { onStartLesson: (lesson: Lesson) => void, completedLessonIds?: string[] }) {
   return (
     <motion.div 
       initial={{ opacity: 0, x: 20 }}
@@ -775,42 +885,47 @@ function ExplorerScreen({ onStartLesson }: { onStartLesson: (lesson: Lesson) => 
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {LESSONS.map((lesson) => (
-          <button 
-            key={lesson.id}
-            onClick={() => onStartLesson(lesson)}
-            className="bg-white p-10 rounded-[3rem] text-left border border-brand-green/10 hover:border-brand-green/30 hover:-translate-y-2 transition-all group relative overflow-hidden card-shadow"
-          >
-            {lesson.isCompleted && (
-              <div className="absolute top-8 right-8">
-                <CheckCircle className="text-brand-green fill-soft-green" size={32} />
+        {LESSONS.map((lesson) => {
+          const isCompleted = completedLessonIds.includes(lesson.id) || lesson.id === "l1"; // Greetings is completed by default
+          const progress = isCompleted ? 100 : lesson.progress;
+
+          return (
+            <button 
+              key={lesson.id}
+              onClick={() => onStartLesson(lesson)}
+              className="bg-white p-10 rounded-[3rem] text-left border border-brand-green/10 hover:border-brand-green/30 hover:-translate-y-2 transition-all group relative overflow-hidden card-shadow"
+            >
+              {isCompleted && (
+                <div className="absolute top-8 right-8">
+                  <CheckCircle className="text-brand-green fill-soft-green" size={32} />
+                </div>
+              )}
+              <div className="flex items-center gap-6 mb-10">
+                <div className="p-6 bg-soft-green rounded-3xl text-brand-green group-hover:bg-brand-green group-hover:text-white transition-all transform group-hover:rotate-12 shadow-lg">
+                  <PlayCircle size={40} />
+                </div>
+                <div>
+                  <h3 className="font-black text-2xl text-deep-forest leading-tight underline decoration-accent-sand decoration-4 underline-offset-4">{lesson.title}</h3>
+                  <span className="text-[10px] font-black text-accent-brown uppercase tracking-[0.2em] block mt-2">{lesson.phrasesCount} Sacred Phrases</span>
+                </div>
               </div>
-            )}
-            <div className="flex items-center gap-6 mb-10">
-              <div className="p-6 bg-soft-green rounded-3xl text-brand-green group-hover:bg-brand-green group-hover:text-white transition-all transform group-hover:rotate-12 shadow-lg">
-                <PlayCircle size={40} />
+              
+              <div className="space-y-4">
+                <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-deep-forest/40">
+                  <span>Calibration</span>
+                  <span>{progress}% Unlocked</span>
+                </div>
+                <div className="h-4 bg-brand-warm-white rounded-full overflow-hidden border border-brand-green/5 p-[2px] shadow-inner">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${progress}%` }}
+                    className="h-full bg-brand-green rounded-full shadow-[0_0_12px_rgba(45,106,79,0.3)]"
+                  />
+                </div>
               </div>
-              <div>
-                <h3 className="font-black text-2xl text-deep-forest leading-tight underline decoration-accent-sand decoration-4 underline-offset-4">{lesson.title}</h3>
-                <span className="text-[10px] font-black text-accent-brown uppercase tracking-[0.2em] block mt-2">{lesson.phrasesCount} Sacred Phrases</span>
-              </div>
-            </div>
-            
-            <div className="space-y-4">
-              <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-deep-forest/40">
-                <span>Calibration</span>
-                <span>{lesson.progress}% Unlocked</span>
-              </div>
-              <div className="h-4 bg-brand-warm-white rounded-full overflow-hidden border border-brand-green/5 p-[2px] shadow-inner">
-                <motion.div 
-                  initial={{ width: 0 }}
-                  animate={{ width: `${lesson.progress}%` }}
-                  className="h-full bg-brand-green rounded-full shadow-[0_0_12px_rgba(45,106,79,0.3)]"
-                />
-              </div>
-            </div>
-          </button>
-        ))}
+            </button>
+          );
+        })}
       </div>
     </motion.div>
   );
@@ -837,29 +952,77 @@ function LessonScreen({ lesson, onComplete, onExit }: { lesson: Lesson, onComple
   
   const options = React.useMemo(() => {
     let correctText = "";
-    let pool: string[] = [];
+    
+    // Get local references of phrases from the same category as the current lesson
+    const sameCatPhrases = lesson.phrases.filter(p => p.id !== currentPhrase.id);
+    // Get phrases from other lessons/categories
+    const diffCatPhrases = DICTIONARY.filter(p => !lesson.phrases.some(lp => lp.id === p.id));
 
-    // Dynamic pools from all available lessons
-    const kadazanPool = LESSONS.flatMap(l => l.phrases.map(p => p.phrase));
-    const bmPool = LESSONS.flatMap(l => l.phrases.map(p => p.meaningBM));
-    const enPool = LESSONS.flatMap(l => l.phrases.map(p => p.meaningEN));
+    let sameCatPool: string[] = [];
+    let diffCatPool: string[] = [];
 
-    if (quizType === "kto_bm" || quizType === "ento_k") {
-      correctText = quizType === "kto_bm" ? currentPhrase.meaningBM : currentPhrase.phrase;
-      pool = quizType === "kto_bm" ? bmPool : kadazanPool;
-    } else if (quizType === "kto_en" || quizType === "bmto_k") {
-      correctText = quizType === "kto_en" ? currentPhrase.meaningEN : currentPhrase.phrase;
-      pool = quizType === "kto_en" ? enPool : kadazanPool;
+    if (quizType === "kto_bm") {
+      correctText = currentPhrase.meaningBM;
+      sameCatPool = sameCatPhrases.map(p => p.meaningBM);
+      diffCatPool = diffCatPhrases.map(p => p.meaningBM);
+    } else if (quizType === "kto_en") {
+      correctText = currentPhrase.meaningEN;
+      sameCatPool = sameCatPhrases.map(p => p.meaningEN);
+      diffCatPool = diffCatPhrases.map(p => p.meaningEN);
+    } else if (quizType === "bmto_k") {
+      correctText = currentPhrase.phrase;
+      sameCatPool = sameCatPhrases.map(p => p.phrase);
+      diffCatPool = diffCatPhrases.map(p => p.phrase);
+    } else if (quizType === "ento_k") {
+      correctText = currentPhrase.phrase;
+      sameCatPool = sameCatPhrases.map(p => p.phrase);
+      diffCatPool = diffCatPhrases.map(p => p.phrase);
     }
 
-    const filteredPool = pool.filter(t => t !== correctText);
-    const distractors = filteredPool.sort(() => Math.random() - 0.5).slice(0, 3);
+    // Filter out the correct answer and eliminate duplicate strings
+    const cleanSamePool = Array.from(new Set(sameCatPool.filter(t => t && t.trim() !== "" && t !== correctText)));
+    const cleanDiffPool = Array.from(new Set(diffCatPool.filter(t => t && t.trim() !== "" && t !== correctText)));
 
-    return [
+    // Select 2 wrong options from the same category
+    const shuffledSame = [...cleanSamePool].sort(() => Math.random() - 0.5);
+    const chosenSame = shuffledSame.slice(0, 2);
+
+    // Filter chosen same-category options out of different-category pool to prevent any duplicates
+    const cleanDiffPoolFiltered = cleanDiffPool.filter(t => !chosenSame.includes(t));
+    const shuffledDiff = [...cleanDiffPoolFiltered].sort(() => Math.random() - 0.5);
+    const chosenDiff = shuffledDiff.slice(0, 1);
+
+    // Combine them
+    let distractors = [...chosenSame, ...chosenDiff];
+
+    // Fallbacks to guarantee exactly 3 distractors if some pools are too small (highly unlikely given DICTIONARY sizes)
+    if (distractors.length < 3) {
+      const remainingSame = shuffledSame.filter(t => !distractors.includes(t));
+      distractors = [...distractors, ...remainingSame];
+    }
+    if (distractors.length < 3) {
+      const remainingDiff = shuffledDiff.filter(t => !distractors.includes(t));
+      distractors = [...distractors, ...remainingDiff];
+    }
+
+    // Limit to exactly 3 unique distractors
+    distractors = Array.from(new Set(distractors)).slice(0, 3);
+
+    const finalOptions = [
       { text: correctText, correct: true },
       ...distractors.map(text => ({ text, correct: false }))
-    ].sort(() => Math.random() - 0.5);
-  }, [currentIndex, currentPhrase, mode, quizType]);
+    ];
+
+    // Perfect structural shuffle to fully randomize position of the correct option
+    for (let i = finalOptions.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const temp = finalOptions[i];
+      finalOptions[i] = finalOptions[j];
+      finalOptions[j] = temp;
+    }
+
+    return finalOptions;
+  }, [currentIndex, currentPhrase, mode, quizType, lesson]);
 
   const handleOptionClick = (option: { text: string, correct: boolean }) => {
     if (selectedOption) return;
