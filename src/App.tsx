@@ -637,7 +637,11 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
     ]
   };
   const activeUser = user || defaultUser;
-  const dailyPhrase = LESSONS[0].phrases[0];
+  const [dailyPhrase] = useState(() => {
+    if (!DICTIONARY || DICTIONARY.length === 0) return LESSONS[0].phrases[0];
+    const randomIndex = Math.floor(Math.random() * DICTIONARY.length);
+    return DICTIONARY[randomIndex];
+  });
   const isStarred = favourites.some(p => p.id === dailyPhrase.id);
 
   return (
