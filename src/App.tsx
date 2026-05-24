@@ -223,10 +223,28 @@ export default function App() {
         
         if (createError) throw createError;
         setUserData(created);
+        if (created) {
+          setGuestUserData((prev: any) => ({
+            ...prev,
+            xp: Math.max(prev.xp || 0, created.xp || 0),
+            phrases_learned: Math.max(prev.phrases_learned || 0, created.phrases_learned || 0),
+            lessons_completed: Math.max(prev.lessons_completed || 0, created.lessons_completed || 0),
+            activity: created.activity || prev.activity
+          }));
+        }
       } else if (error) {
         throw error;
       } else {
         setUserData(data);
+        if (data) {
+          setGuestUserData((prev: any) => ({
+            ...prev,
+            xp: Math.max(prev.xp || 0, data.xp || 0),
+            phrases_learned: Math.max(prev.phrases_learned || 0, data.phrases_learned || 0),
+            lessons_completed: Math.max(prev.lessons_completed || 0, data.lessons_completed || 0),
+            activity: data.activity || prev.activity
+          }));
+        }
       }
     } catch (error) {
       console.error("Failed to fetch user data:", error);
@@ -295,14 +313,16 @@ export default function App() {
       return act;
     });
 
+    // Always persist to local memory first
+    setGuestUserData((prev: any) => ({
+      ...prev,
+      xp: updatedXp,
+      lessons_completed: updatedLessons,
+      phrases_learned: updatedPhrases,
+      activity: updatedActivity
+    }));
+
     if (!userData || !session) {
-      setGuestUserData((prev: any) => ({
-        ...prev,
-        xp: updatedXp,
-        lessons_completed: updatedLessons,
-        phrases_learned: updatedPhrases,
-        activity: updatedActivity
-      }));
       toast.success("Progress Saved to Local Memory! +50 XP");
       setCurrentScreen("explorer");
       return;
@@ -747,8 +767,17 @@ function HomeScreen({ user, onContinue, favourites, onToggleFavourite }: { user:
   const activeUser = user || defaultUser;
   const [dailyPhrase] = useState(() => {
     if (!DICTIONARY || DICTIONARY.length === 0) return LESSONS[0].phrases[0];
+    
+    // Create or retrieve a session-specific seed so each session gets a different word.
+    let sessionKey = sessionStorage.getItem("dialect_bridge_session_seed");
+    if (!sessionKey) {
+      sessionKey = Math.floor(Math.random() * 1000000).toString();
+      sessionStorage.setItem("dialect_bridge_session_seed", sessionKey);
+    }
+    
     const today = new Date();
-    const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const dateSeed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
+    const seed = dateSeed + parseInt(sessionKey, 10);
     const index = seed % DICTIONARY.length;
     return DICTIONARY[index];
   });
