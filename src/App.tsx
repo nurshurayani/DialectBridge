@@ -1505,43 +1505,62 @@ function ProfileScreen({ user, favourites, onToggleFavourite }: { user: any, fav
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-        {/* Activity Chart */}
+        {/* Lessons Progress Card */}
         <div className="bg-white p-12 rounded-[4rem] border border-brand-green/10 shadow-sm space-y-10 card-shadow relative overflow-hidden group">
-          <div className="absolute top-10 right-10 text-accent-sand/10 opacity-0 group-hover:opacity-100 transition-opacity">
-            <BarChart size={100} />
+          <div className="absolute top-10 right-10 text-brand-green/5 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Library size={100} />
           </div>
           <h3 className="text-3xl font-black text-deep-forest flex items-center gap-4">
-            <span className="text-accent-sand text-4xl">📊</span> Calibration History
+            <span className="text-brand-green text-4xl">📚</span> Lessons Progress
           </h3>
-          <div className="h-72 w-full relative">
-            {(activeUser.activity || []).every((a: any) => (a.count || 0) === 0) && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 backdrop-blur-[2px] z-20 rounded-[2rem] text-center p-6 space-y-2">
-                <p className="text-lg font-black text-brand-green">No activity yet</p>
-                <p className="text-xs font-bold text-deep-forest/40">Start your first lesson to track progress</p>
-              </div>
-            )}
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={activeUser.activity || []}>
-                <XAxis 
-                  dataKey="day" 
-                  axisLine={false} 
-                  tickLine={false} 
-                  tick={{fontSize: 12, fontWeight: 900, fill: '#1B4332', opacity: 0.3}} 
-                />
-                <Tooltip 
-                  cursor={{fill: '#2D6A4F05'}}
-                  contentStyle={{borderRadius: '32px', border: 'none', background: '#1B4332', color: 'white', fontWeight: 900, fontSize: '14px', boxShadow: '0 20px 30px -10px rgba(0, 0, 0, 0.2)', padding: '20px'}}
-                  itemStyle={{color: 'white'}}
-                />
-                <Bar dataKey="count" radius={[16, 16, 16, 16]} barSize={24}>
-                  {(activeUser.activity || []).map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={(entry.count || 0) > 0 ? '#2D6A4F' : '#F8F9FA'} className="transition-all hover:brightness-125" />
-                  ))}
-                </Bar>
-              </RechartsBarChart>
-            </ResponsiveContainer>
+          
+          <div className="space-y-8">
+            {[
+              { name: "Greetings", id: "l1" },
+              { name: "Family", id: "l2" },
+              { name: "Numbers", id: "l4" },
+              { name: "Colours", id: "l3" },
+              { name: "Body Parts", id: "l5" },
+              { name: "Food", id: "l9" },
+              { name: "Nature", id: "l10" },
+              { name: "Celebrations", id: "l11" }
+            ].map((cat) => {
+              const isCompleted = activeUser.completed_lesson_ids?.includes(cat.id) || cat.id === "l1";
+              const matchingLesson = LESSONS.find(l => l.category === cat.name || l.title === cat.name);
+              const totalPhrases = matchingLesson ? matchingLesson.phrases.length : 8;
+              const completedPhrases = isCompleted ? totalPhrases : 0;
+              const percent = Math.round((completedPhrases / totalPhrases) * 100);
+
+              return (
+                <div key={cat.name} className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center gap-3">
+                      <span className="font-black text-xl text-deep-forest">{cat.name}</span>
+                      {isCompleted && (
+                        <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-[10px] font-black border border-amber-300 flex items-center gap-1.5 shadow-sm">
+                          <CheckCircle size={12} className="text-amber-600 fill-amber-100" />
+                          100% Complete
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-xs font-black text-deep-forest/40 uppercase tracking-widest">
+                      {completedPhrases} / {totalPhrases} phrases
+                    </span>
+                  </div>
+                  
+                  {/* Progress Bar Container */}
+                  <div className="h-4 bg-brand-warm-white rounded-full overflow-hidden border border-brand-green/5 p-[2px] shadow-inner relative">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${percent}%` }}
+                      className="h-full bg-brand-green rounded-full shadow-[0_0_12px_rgba(45,106,79,0.3)]"
+                      style={{ backgroundColor: "#2D6A4F" }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <p className="text-xs text-center text-gray-300 font-black uppercase tracking-[0.3em] pt-6 border-t border-gray-50">Ancestral phrases learned this week</p>
         </div>
 
         {/* Achievement Badges */}
