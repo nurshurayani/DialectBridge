@@ -46,11 +46,17 @@ function cn(...inputs: ClassValue[]) {
 type Screen = "auth" | "home" | "explorer" | "lesson" | "community" | "profile" | "dictionary" | "unconfigured";
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<Screen>(isSupabaseConfigured ? "auth" : "unconfigured");
+  const [currentScreen, setCurrentScreen] = useState<Screen>(() => {
+    if (isSupabaseConfigured) {
+      return "auth";
+    }
+    const localUser = localStorage.getItem("dialect_bridge_logged_in_username");
+    return localUser ? "home" : "unconfigured";
+  });
   const [activeLesson, setActiveLesson] = useState<Lesson | null>(null);
   const [userData, setUserData] = useState<any>(null);
   
-  // Initialize community posts from cloud or fallback local guest posts
+  // Initialize community posts from cloud or fallback local posts
   const [communityPosts, setCommunityPosts] = useState<any[]>(() => {
     try {
       const saved = localStorage.getItem("dialect_bridge_guest_community_posts");
@@ -62,93 +68,180 @@ export default function App() {
 
   const [loading, setLoading] = useState(isSupabaseConfigured);
   const [session, setSession] = useState<any>(null);
+  const [localUsername, setLocalUsername] = useState<string | null>(() => {
+    return localStorage.getItem("dialect_bridge_logged_in_username");
+  });
   const [authError, setAuthError] = useState<string | null>(null);
   const [favourites, setFavourites] = useState<Phrase[]>([]);
 
   // Mastered phrases state to build completion on quiz performance
-  const [masteredPhraseIds, setMasteredPhraseIds] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem("dialect_bridge_mastered_phrases");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+  const [masteredPhraseIds, setMasteredPhraseIds] = useState<string[]>([]);
+  const [bestScores, setBestScores] = useState<Record<string, number>>({});
+  const [lastOpenedLessonId, setLastOpenedLessonId] = useState<string>("l1");
+  const [hasSubmittedPost, setHasSubmittedPost] = useState<boolean>(false);
+  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>([]);
+  
+  const [guestUserData, setGuestUserData] = useState<any>({
+    xp: 0,
+    streak: 1,
+    phrases_learned: 0,
+    lessons_completed: 0,
+    activity: [
+      { day: "Mon", count: 0 },
+      { day: "Tue", count: 0 },
+      { day: "Wed", count: 0 },
+      { day: "Thu", count: 0 },
+      { day: "Fri", count: 0 },
+      { day: "Sat", count: 0 },
+      { day: "Sun", count: 0 },
+    ]
   });
 
-  const [bestScores, setBestScores] = useState<Record<string, number>>(() => {
-    try {
-      const saved = localStorage.getItem("dialect_bridge_best_scores");
-      return saved ? JSON.parse(saved) : {};
-    } catch {
-      return {};
+  const [userStatesLoaded, setUserStatesLoaded] = useState(false);
+
+  // Compute active user name/id
+  const currentUsername = session 
+    ? (session.user.user_metadata?.username || session.user.email?.split('@')[0]) 
+    : localUsername;
+
+  // Sign out helper
+  const handleSignOut = async () => {
+    if (isSupabaseConfigured) {
+      await supabase.auth.signOut();
+    } else {
+      setLocalUsername(null);
+      localStorage.removeItem("dialect_bridge_logged_in_username");
+      setCurrentScreen("auth");
     }
-  });
+  };
+
+  // On username change, load user-specific states from localStorage
+  useEffect(() => {
+    if (!currentUsername) {
+      setUserStatesLoaded(false);
+      return;
+    }
+
+    try {
+      setUserStatesLoaded(false);
+      const keyPrefix = `dialect_bridge_user_${currentUsername.toLowerCase()}`;
+      
+      const savedMastered = localStorage.getItem(`${keyPrefix}_mastered_phrases`);
+      setMasteredPhraseIds(savedMastered ? JSON.parse(savedMastered) : []);
+
+      const savedBestScores = localStorage.getItem(`${keyPrefix}_best_scores`);
+      setBestScores(savedBestScores ? JSON.parse(savedBestScores) : {});
+
+      const savedCompleted = localStorage.getItem(`${keyPrefix}_completed_lessons`);
+      setCompletedLessonIds(savedCompleted ? JSON.parse(savedCompleted) : []);
+
+      const savedUser = localStorage.getItem(`${keyPrefix}_user_data`);
+      if (savedUser) {
+        setGuestUserData(JSON.parse(savedUser));
+      } else {
+        setGuestUserData({
+          xp: 0,
+          streak: 1,
+          phrases_learned: 0,
+          lessons_completed: 0,
+          activity: [
+            { day: "Mon", count: 0 },
+            { day: "Tue", count: 0 },
+            { day: "Wed", count: 0 },
+            { day: "Thu", count: 0 },
+            { day: "Fri", count: 0 },
+            { day: "Sat", count: 0 },
+            { day: "Sun", count: 0 },
+          ]
+        });
+      }
+
+      const savedFavourites = localStorage.getItem(`${keyPrefix}_favourites`);
+      setFavourites(savedFavourites ? JSON.parse(savedFavourites) : []);
+
+      const savedLastLesson = localStorage.getItem(`${keyPrefix}_last_opened_lesson_id`);
+      setLastOpenedLessonId(savedLastLesson || "l1");
+
+      const savedSubmitted = localStorage.getItem(`${keyPrefix}_submitted_post`);
+      setHasSubmittedPost(savedSubmitted === "true");
+
+      setUserStatesLoaded(true);
+    } catch (e) {
+      console.error("Error loading user progress from localStorage", e);
+      setUserStatesLoaded(true); // Don't lock UI
+    }
+  }, [currentUsername]);
+
+  // Save masteredPhraseIds per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_mastered_phrases`,
+      JSON.stringify(masteredPhraseIds)
+    );
+  }, [masteredPhraseIds, currentUsername, userStatesLoaded]);
+
+  // Save bestScores per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_best_scores`,
+      JSON.stringify(bestScores)
+    );
+  }, [bestScores, currentUsername, userStatesLoaded]);
+
+  // Save completedLessonIds per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_completed_lessons`,
+      JSON.stringify(completedLessonIds)
+    );
+  }, [completedLessonIds, currentUsername, userStatesLoaded]);
+
+  // Save guestUserData per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_user_data`,
+      JSON.stringify(guestUserData)
+    );
+  }, [guestUserData, currentUsername, userStatesLoaded]);
+
+  // Save favourites per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_favourites`,
+      JSON.stringify(favourites)
+    );
+  }, [favourites, currentUsername, userStatesLoaded]);
+
+  // Save lastOpenedLessonId per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_last_opened_lesson_id`,
+      lastOpenedLessonId
+    );
+  }, [lastOpenedLessonId, currentUsername, userStatesLoaded]);
+
+  // Save hasSubmittedPost per user
+  useEffect(() => {
+    if (!currentUsername || !userStatesLoaded) return;
+    localStorage.setItem(
+      `dialect_bridge_user_${currentUsername.toLowerCase()}_submitted_post`,
+      hasSubmittedPost ? "true" : "false"
+    );
+  }, [hasSubmittedPost, currentUsername, userStatesLoaded]);
 
   const saveBestScore = (lessonId: string, score: number) => {
     const currentBest = bestScores[lessonId] || 0;
     if (score > currentBest) {
       const updated = { ...bestScores, [lessonId]: score };
       setBestScores(updated);
-      localStorage.setItem("dialect_bridge_best_scores", JSON.stringify(updated));
     }
   };
-
-  useEffect(() => {
-    localStorage.setItem("dialect_bridge_mastered_phrases", JSON.stringify(masteredPhraseIds));
-  }, [masteredPhraseIds]);
-
-  const [lastOpenedLessonId, setLastOpenedLessonId] = useState<string>(() => {
-    return localStorage.getItem("dialect_bridge_last_opened_lesson_id") || "l1";
-  });
-
-  const [hasSubmittedPost, setHasSubmittedPost] = useState<boolean>(() => {
-    return localStorage.getItem("dialect_bridge_submitted_post") === "true";
-  });
-
-  const [guestUserData, setGuestUserData] = useState<any>(() => {
-    const saved = localStorage.getItem("dialect_bridge_guest_user");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        // Fallback
-      }
-    }
-    return {
-      xp: 0,
-      phrases_learned: 0,
-      lessons_completed: 0,
-      activity: [
-        { day: "Mon", count: 0 },
-        { day: "Tue", count: 0 },
-        { day: "Wed", count: 0 },
-        { day: "Thu", count: 0 },
-        { day: "Fri", count: 0 },
-        { day: "Sat", count: 0 },
-        { day: "Sun", count: 0 },
-      ]
-    };
-  });
-
-  const [completedLessonIds, setCompletedLessonIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem("dialect_bridge_completed_lessons");
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem("dialect_bridge_guest_user", JSON.stringify(guestUserData));
-  }, [guestUserData]);
-
-  useEffect(() => {
-    localStorage.setItem("dialect_bridge_completed_lessons", JSON.stringify(completedLessonIds));
-  }, [completedLessonIds]);
 
   // Compute calculated values based strictly on live mastered phrases to prevent resets
   const calculatedCompletedLessonsCount = LESSONS.filter(lesson => {
@@ -158,6 +251,7 @@ export default function App() {
 
   const activeUser = (session && userData) ? {
     ...userData,
+    username: currentUsername || "Guardian",
     completed_lesson_ids: completedLessonIds,
     mastered_phrase_ids: masteredPhraseIds,
     phrases_learned: masteredPhraseIds.length,
@@ -165,27 +259,13 @@ export default function App() {
     has_submitted_post: hasSubmittedPost
   } : {
     ...guestUserData,
+    username: currentUsername || "Offline Guardian",
     completed_lesson_ids: completedLessonIds,
     mastered_phrase_ids: masteredPhraseIds,
     phrases_learned: masteredPhraseIds.length,
     lessons_completed: calculatedCompletedLessonsCount,
     has_submitted_post: hasSubmittedPost
   };
-
-  useEffect(() => {
-    const stored = localStorage.getItem("dialect_bridge_favourites");
-    if (stored) {
-      try {
-        setFavourites(JSON.parse(stored));
-      } catch (e) {
-        console.error("Failed to parse favourites", e);
-      }
-    }
-  }, []);
-
-  useEffect(() => {
-    localStorage.setItem("dialect_bridge_favourites", JSON.stringify(favourites));
-  }, [favourites]);
 
   const toggleFavourite = (phrase: Phrase) => {
     setFavourites(prev => {
@@ -613,10 +693,17 @@ export default function App() {
           )}>
             <AnimatePresence mode="wait">
               {currentScreen === "unconfigured" && (
-                <UnconfiguredScreen key="unconfigured" onSkip={() => setCurrentScreen("home")} />
+                <UnconfiguredScreen key="unconfigured" onProceedToAuth={() => setCurrentScreen("auth")} />
               )}
               {currentScreen === "auth" && (
-                <AuthScreen key="auth" onSkip={() => setCurrentScreen("home")} />
+                <AuthScreen 
+                  key="auth" 
+                  onLocalLogin={(user) => {
+                    localStorage.setItem("dialect_bridge_logged_in_username", user);
+                    setLocalUsername(user);
+                    setCurrentScreen("home");
+                  }} 
+                />
               )}
               {currentScreen === "home" && (
                 <HomeScreen 
@@ -663,6 +750,7 @@ export default function App() {
                   masteredPhraseIds={masteredPhraseIds}
                   bestScores={bestScores}
                   hasSubmittedPost={hasSubmittedPost}
+                  onSignOut={handleSignOut}
                 />
               )}
               {currentScreen === "dictionary" && (
@@ -726,7 +814,7 @@ function NavButton({ icon, active, onClick }: { icon: React.ReactNode, active: b
   );
 }
 
-function UnconfiguredScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
+function UnconfiguredScreen({ onProceedToAuth, key }: { onProceedToAuth: () => void, key?: string }) {
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-brand-warm-white" key={key}>
       <motion.div 
@@ -751,23 +839,21 @@ function UnconfiguredScreen({ onSkip, key }: { onSkip?: () => void, key?: string
           </ol>
         </div>
         
-        {onSkip && (
-          <button 
-            type="button"
-            onClick={onSkip}
-            className="w-full bg-brand-green text-white py-5 rounded-3xl font-black text-lg shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4 flex items-center justify-center gap-3"
-          >
-            Continue as Guest (Offline Mode) →
-          </button>
-        )}
+        <button 
+          type="button"
+          onClick={onProceedToAuth}
+          className="w-full bg-brand-green text-white py-5 rounded-3xl font-black text-lg shadow-xl hover:brightness-110 active:scale-95 transition-all mt-4 flex items-center justify-center gap-3"
+        >
+          Sign In / Sign Up Locally →
+        </button>
         
-        <p className="text-xs font-black text-gray-400 uppercase tracking-widest pt-2">Connect to Supabase to save your heritage progress.</p>
+        <p className="text-xs font-black text-gray-400 uppercase tracking-widest pt-2">Connect to Supabase for cloud backup, or log in locally now.</p>
       </motion.div>
     </div>
   );
 }
 
-function AuthScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
+function AuthScreen({ onLocalLogin, key }: { onLocalLogin?: (username: string) => void, key?: string }) {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isSignUp, setIsSignUp] = useState(false);
@@ -776,6 +862,42 @@ function AuthScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+
+    if (!isSupabaseConfigured) {
+      try {
+        const normalizedUsername = username.trim().toLowerCase();
+        if (!normalizedUsername) {
+          throw new Error("Guardian Username is required");
+        }
+        
+        const savedUsersRaw = localStorage.getItem("dialect_bridge_local_users");
+        const localUsers = savedUsersRaw ? JSON.parse(savedUsersRaw) : {};
+        
+        if (isSignUp) {
+          if (localUsers[normalizedUsername]) {
+            throw new Error("Identity already claimed! Try another name.");
+          }
+          localUsers[normalizedUsername] = password;
+          localStorage.setItem("dialect_bridge_local_users", JSON.stringify(localUsers));
+          toast.success("Identity Secured! You can now sign in.");
+          setIsSignUp(false);
+        } else {
+          if (!localUsers[normalizedUsername] || localUsers[normalizedUsername] !== password) {
+            throw new Error("Incorrect Username or Password.");
+          }
+          toast.success("Welcome back, guardian.");
+          if (onLocalLogin) {
+            onLocalLogin(username.trim());
+          }
+        }
+      } catch (error: any) {
+        toast.error(error.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     // Convert username to a valid internal email format for Supabase
     const email = `${username.trim().toLowerCase()}@dialectbridge.auth`;
     
@@ -854,7 +976,7 @@ function AuthScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
           >
             {loading ? (
               <motion.div animate={{ rotate: 360 }} transition={{ repeat: Infinity, duration: 1 }}><Volume2 size={24} /></motion.div>
-            ) : (isSignUp ? "Protect Identity" : "Enter the Bridge")}
+            ) : (isSignUp ? "Protect Identity font-sans" : "Enter the Bridge")}
           </button>
         </form>
 
@@ -864,16 +986,6 @@ function AuthScreen({ onSkip, key }: { onSkip?: () => void, key?: string }) {
         >
           {isSignUp ? "Already a guardian? Sign In" : "New descendant? Create Identity"}
         </button>
-
-        {onSkip && (
-          <button 
-            type="button"
-            onClick={onSkip}
-            className="w-full mt-4 bg-brand-green/10 text-brand-green py-5 rounded-[2rem] font-black text-lg hover:bg-brand-green/20 transition-all text-center flex items-center justify-center gap-2 border border-brand-green/20"
-          >
-            <span>Continue as Guest (Local Memory)</span> <span>→</span>
-          </button>
-        )}
 
         <div className="mt-8 pt-8 border-t border-brand-green/5 text-center">
           <p className="text-[9px] uppercase font-black text-gray-300 tracking-[0.2em] leading-relaxed">
@@ -1780,14 +1892,16 @@ function ProfileScreen({
   onToggleFavourite,
   masteredPhraseIds = [],
   bestScores = {},
-  hasSubmittedPost = false
+  hasSubmittedPost = false,
+  onSignOut
 }: { 
   user: any, 
   favourites: Phrase[], 
   onToggleFavourite: (phrase: Phrase) => void,
   masteredPhraseIds?: string[],
   bestScores?: Record<string, number>,
-  hasSubmittedPost?: boolean
+  hasSubmittedPost?: boolean,
+  onSignOut?: () => void
 }) {
   const defaultUser = {
     streak: 0,
@@ -1900,7 +2014,7 @@ function ProfileScreen({
           K
         </div>
         <div className="text-center md:text-left space-y-4 relative z-10">
-          <h2 className="text-5xl font-black text-brand-green tracking-tight leading-none">Kadazan-Dusun Warrior</h2>
+          <h2 className="text-5xl font-black text-brand-green tracking-tight leading-none">{activeUser.username || "Kadazan-Dusun Warrior"}</h2>
           <p className="text-deep-forest/40 font-bold text-xl italic font-cultural leading-tight">"A descendant reclaiming what was once unheard."</p>
           <div className="flex flex-wrap justify-center md:justify-start gap-4 mt-8">
             <span className="bg-soft-green px-8 py-3 rounded-2xl text-sm font-black text-brand-green flex items-center gap-3 shadow-sm border border-brand-green/5">
@@ -1910,7 +2024,7 @@ function ProfileScreen({
               <Trophy size={22} className="text-accent-sand" /> {activeUser.xp || 0} XP Points
             </span>
             <button 
-              onClick={() => supabase.auth.signOut()}
+              onClick={onSignOut}
               className="bg-red-50 px-8 py-3 rounded-2xl text-sm font-black text-red-600 flex items-center gap-3 shadow-sm border border-red-100 hover:bg-red-100 transition-colors"
             >
               Sign Out
