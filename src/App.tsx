@@ -75,6 +75,24 @@ export default function App() {
     }
   });
 
+  const [bestScores, setBestScores] = useState<Record<string, number>>(() => {
+    try {
+      const saved = localStorage.getItem("dialect_bridge_best_scores");
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
+  const saveBestScore = (lessonId: string, score: number) => {
+    const currentBest = bestScores[lessonId] || 0;
+    if (score > currentBest) {
+      const updated = { ...bestScores, [lessonId]: score };
+      setBestScores(updated);
+      localStorage.setItem("dialect_bridge_best_scores", JSON.stringify(updated));
+    }
+  };
+
   useEffect(() => {
     localStorage.setItem("dialect_bridge_mastered_phrases", JSON.stringify(masteredPhraseIds));
   }, [masteredPhraseIds]);
@@ -325,7 +343,7 @@ export default function App() {
     localStorage.setItem("dialect_bridge_last_opened_lesson_id", lesson.id);
   };
 
-  const handleLessonComplete = async (correctPhraseIdsThisSession: string[]) => {
+  const handleLessonComplete = async (correctPhraseIdsThisSession: string[], score?: number) => {
     if (!activeLesson) {
       setCurrentScreen("explorer");
       return;
@@ -346,7 +364,8 @@ export default function App() {
     // Update local mastered state
     setMasteredPhraseIds(updatedMasteredList);
 
-    const isFullyCompletedNow = activeLesson.phrases.every(p => updatedMasteredList.includes(p.id));
+    const quizScore = score ?? 0;
+    const isFullyCompletedNow = quizScore === activeLesson.phrases.length || (bestScores[lessonId] || 0) === activeLesson.phrases.length;
     if (isFullyCompletedNow) {
       setCompletedLessonIds(prev => prev.includes(lessonId) ? prev : [...prev, lessonId]);
     }
@@ -359,7 +378,8 @@ export default function App() {
 
     const calculatedCompletedLessonsCount = LESSONS.filter(lesson => {
       const total = lesson.phrases.length;
-      return total > 0 && lesson.phrases.every(p => updatedMasteredList.includes(p.id));
+      const best = lesson.id === lessonId ? Math.max(bestScores[lesson.id] || 0, quizScore) : (bestScores[lesson.id] || 0);
+      return total > 0 && best === total;
     }).length;
 
     const currentActivity = activeUser.activity || [
@@ -612,6 +632,7 @@ export default function App() {
                   favourites={favourites}
                   onToggleFavourite={toggleFavourite}
                   masteredPhraseIds={masteredPhraseIds}
+                  bestScores={bestScores}
                   lastOpenedLessonId={lastOpenedLessonId}
                   onResumeLesson={(lessonId) => {
                     const matchingLesson = LESSONS.find(l => l.id === lessonId);
@@ -625,7 +646,7 @@ export default function App() {
                 <ExplorerScreen 
                   onStartLesson={handleStartLesson} 
                   completedLessonIds={completedLessonIds}
-                  masteredPhraseIds={masteredPhraseIds}
+                  bestScores={bestScores}
                 />
               )}
               {currentScreen === "community" && (
@@ -640,6 +661,7 @@ export default function App() {
                   favourites={favourites}
                   onToggleFavourite={toggleFavourite}
                   masteredPhraseIds={masteredPhraseIds}
+                  bestScores={bestScores}
                   hasSubmittedPost={hasSubmittedPost}
                 />
               )}
@@ -650,7 +672,10 @@ export default function App() {
                 <LessonScreen 
                   key="lesson" 
                   lesson={activeLesson} 
-                  onComplete={handleLessonComplete}
+                  onComplete={(correctPhraseIds, score) => {
+                    saveBestScore(activeLesson.id, score);
+                    handleLessonComplete(correctPhraseIds, score);
+                  }}
                   onExit={() => setCurrentScreen("explorer")}
                   masteredPhraseIds={masteredPhraseIds}
                   onPhraseMastered={(phraseId) => {
@@ -866,6 +891,7 @@ function HomeScreen({
   favourites, 
   onToggleFavourite,
   masteredPhraseIds = [],
+  bestScores = {},
   lastOpenedLessonId = "l1",
   onResumeLesson
 }: { 
@@ -874,6 +900,7 @@ function HomeScreen({
   favourites: Phrase[], 
   onToggleFavourite: (phrase: Phrase) => void,
   masteredPhraseIds?: string[],
+  bestScores?: Record<string, number>,
   lastOpenedLessonId?: string,
   onResumeLesson: (lessonId: string) => void
 }) {
@@ -912,9 +939,9 @@ function HomeScreen({
   // Math calculation of progress for the last opened lesson
   const lastLesson = LESSONS.find(l => l.id === lastOpenedLessonId) || LESSONS[0];
   const totalPhrasesInLastLesson = lastLesson.phrases.length;
-  const masteredInLastLesson = lastLesson.phrases.filter(p => masteredPhraseIds.includes(p.id)).length;
+  const bestScoreInLastLesson = bestScores[lastLesson.id] || 0;
   const lastLessonProgressPercent = totalPhrasesInLastLesson > 0 
-    ? Math.round((masteredInLastLesson / totalPhrasesInLastLesson) * 100) 
+    ? Math.round((bestScoreInLastLesson / totalPhrasesInLastLesson) * 100) 
     : 0;
 
   return (
@@ -1027,7 +1054,7 @@ function HomeScreen({
               </div>
 
               <div className="flex justify-between items-center text-xs font-black text-deep-forest/40 uppercase tracking-widest pt-1">
-                <span>{masteredInLastLesson} / {totalPhrasesInLastLesson} Phrases Mastered</span>
+                <span>{bestScoreInLastLesson} / {totalPhrasesInLastLesson} Phrases Mastered</span>
                 {lastLessonProgressPercent === 100 && <span className="text-amber-600 flex items-center gap-1">🌟 Golden Mastery</span>}
               </div>
             </div>
@@ -1075,11 +1102,11 @@ function HomeScreen({
 function ExplorerScreen({ 
   onStartLesson, 
   completedLessonIds = [],
-  masteredPhraseIds = []
+  bestScores = {}
 }: { 
   onStartLesson: (lesson: Lesson) => void, 
   completedLessonIds?: string[],
-  masteredPhraseIds?: string[]
+  bestScores?: Record<string, number>
 }) {
   return (
     <motion.div 
@@ -1092,14 +1119,14 @@ function ExplorerScreen({
         <h2 className="text-4xl font-black text-brand-green tracking-tight">Lesson Explorer</h2>
         <p className="text-deep-forest/40 text-lg font-medium italic">Your journey back to roots starts here.</p>
       </header>
-
+ 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
         {LESSONS.map((lesson) => {
           const totalPhrases = lesson.phrases.length;
-          const masteredCount = lesson.phrases.filter(p => masteredPhraseIds.includes(p.id)).length;
-          const progress = totalPhrases > 0 ? Math.round((masteredCount / totalPhrases) * 100) : 0;
+          const bestScore = bestScores[lesson.id] || 0;
+          const progress = totalPhrases > 0 ? Math.round((bestScore / totalPhrases) * 100) : 0;
           const isCompleted = progress === 100;
-
+ 
           return (
             <button 
               key={lesson.id}
@@ -1151,7 +1178,7 @@ function LessonScreen({
   onPhraseMastered
 }: { 
   lesson: Lesson, 
-  onComplete: (correctPhraseIds: string[]) => void, 
+  onComplete: (correctPhraseIds: string[], score: number) => void, 
   onExit: () => void, 
   masteredPhraseIds?: string[],
   onPhraseMastered?: (phraseId: string) => void,
@@ -1162,15 +1189,25 @@ function LessonScreen({
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [wrongOptions, setWrongOptions] = useState<string[]>([]);
   const [correctPhraseIdsThisSession, setCorrectPhraseIdsThisSession] = useState<string[]>([]);
+  const [correctAnswersCount, setCorrectAnswersCount] = useState(0);
   const [mode, setMode] = useState<"learning" | "quiz">("learning");
   const [quizType, setQuizType] = useState<"kto_bm" | "kto_en" | "bmto_k" | "ento_k">("kto_bm");
-
   const [quizOrder, setQuizOrder] = useState<number[]>([]);
+  const [isAnswered, setIsAnswered] = useState(false);
+  const [isAnswerCorrect, setIsAnswerCorrect] = useState<boolean | null>(null);
+  const [quizFinished, setQuizFinished] = useState(false);
 
   useEffect(() => {
     if (mode === "quiz") {
       const order = Array.from({ length: lesson.phrases.length }, (_, i) => i);
       setQuizOrder(order.sort(() => Math.random() - 0.5));
+      setCorrectAnswersCount(0);
+      setQuizFinished(false);
+      setCurrentIndex(0);
+      setSelectedOption(null);
+      setWrongOptions([]);
+      setIsAnswered(false);
+      setIsAnswerCorrect(null);
     }
   }, [mode, lesson.phrases.length]);
 
@@ -1252,11 +1289,15 @@ function LessonScreen({
   }, [currentIndex, currentPhrase, mode, quizType, lesson]);
 
   const handleOptionClick = (option: { text: string, correct: boolean }) => {
-    if (selectedOption !== null) return; // already solved this question
+    if (isAnswered) return;
+
+    setSelectedOption(option.text);
+    setIsAnswered(true);
+    setIsAnswerCorrect(option.correct);
 
     if (option.correct) {
-      setSelectedOption(option.text);
-      toast.success("Tepat sekali! Your ancestors are proud.");
+      toast.success("Tepat sekali! Correct!");
+      setCorrectAnswersCount(prev => prev + 1);
       
       const phraseId = currentPhrase.id;
       // Triggers mastered state update cleanly
@@ -1267,9 +1308,37 @@ function LessonScreen({
         }
       }
     } else {
-      toast.error("Almost there. Try again!");
+      toast.error("Salah! Proceeding automatically...");
       setWrongOptions(prev => prev.includes(option.text) ? prev : [...prev, option.text]);
     }
+
+    // Automatically proceed with timing feedback
+    setTimeout(() => {
+      if (currentIndex < lesson.phrases.length - 1) {
+        setCurrentIndex(prev => prev + 1);
+        setSelectedOption(null);
+        setWrongOptions([]);
+        setIsAnswered(false);
+        setIsAnswerCorrect(null);
+        setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
+      } else {
+        const finalScore = correctAnswersCount + (option.correct ? 1 : 0);
+        onComplete(correctPhraseIdsThisSession, finalScore);
+        setQuizFinished(true);
+      }
+    }, 1500);
+  };
+
+  const handleRetryQuiz = () => {
+    const order = Array.from({ length: lesson.phrases.length }, (_, i) => i);
+    setQuizOrder(order.sort(() => Math.random() - 0.5));
+    setCorrectAnswersCount(0);
+    setQuizFinished(false);
+    setCurrentIndex(0);
+    setSelectedOption(null);
+    setWrongOptions([]);
+    setIsAnswered(false);
+    setIsAnswerCorrect(null);
   };
 
   const next = () => {
@@ -1279,41 +1348,85 @@ function LessonScreen({
         setIsRevealed(false);
       } else {
         setMode("quiz");
-        setCurrentIndex(0);
-        setSelectedOption(null);
-        setWrongOptions([]);
-        setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
-      }
-    } else {
-      if (currentIndex < lesson.phrases.length - 1) {
-        setCurrentIndex(currentIndex + 1);
-        setSelectedOption(null);
-        setWrongOptions([]);
-        setQuizType(["kto_bm", "kto_en", "bmto_k", "ento_k"][Math.floor(Math.random() * 4)] as any);
-      } else {
-        onComplete(correctPhraseIdsThisSession); // Pass mastered phrases cleanly
       }
     }
   };
 
   const back = () => {
-    if (mode === "quiz") {
-      if (currentIndex > 0) {
-        setCurrentIndex(currentIndex - 1);
-        setSelectedOption(null);
-        setWrongOptions([]);
-      } else {
-        setMode("learning");
-        setCurrentIndex(lesson.phrases.length - 1);
-        setIsRevealed(true);
-      }
-    } else {
+    if (mode === "learning") {
       if (currentIndex > 0) {
         setCurrentIndex(currentIndex - 1);
         setIsRevealed(false);
       }
     }
   };
+
+  if (quizFinished) {
+    const totalCount = lesson.phrases.length;
+    const scorePercent = Math.round((correctAnswersCount / totalCount) * 100);
+    
+    let motivationalMessage = "";
+    let motivationalSub = "";
+    if (scorePercent === 100) {
+      motivationalMessage = "🌟 Golden Mastery Achieved!";
+      motivationalSub = "Tepat sekali! You correctly answered every ancestral challenge. The voices of your elders echo proudly in you.";
+    } else if (scorePercent >= 70) {
+      motivationalMessage = "✨ High Heritage Guardian!";
+      motivationalSub = "Outstanding effort! You have a solid grasp of this dialect. Continue to nourish this connection.";
+    } else if (scorePercent >= 40) {
+      motivationalMessage = "🌱 Descendant Practitioner!";
+      motivationalSub = "A respectable milestone! Every word learned is a thread of your cultural fabric restored.";
+    } else {
+      motivationalMessage = "🍂 Cultural Journey Seeker";
+      motivationalSub = "Do not be discouraged. Reclaiming our tongue takes courage and practice. Your roots are waiting.";
+    }
+
+    return (
+      <div className="fixed inset-0 bg-brand-warm-white z-50 flex flex-col justify-center items-center p-6 md:p-12 overflow-y-auto">
+        <motion.div 
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white max-w-2xl w-full p-10 md:p-14 rounded-[3.5rem] border-2 border-brand-green/10 shadow-2xl relative text-center space-y-8"
+        >
+          <div className="absolute top-10 right-10 opacity-10 text-brand-green">
+            <Trophy size={80} />
+          </div>
+
+          <div className="space-y-3">
+            <span className="text-[12px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-60">Entrance Quiz Completed</span>
+            <h2 className="text-4xl md:text-5xl font-black text-brand-green leading-tight">{lesson.title} Results</h2>
+          </div>
+
+          <div className="py-10 bg-soft-green/50 rounded-[2.5rem] border border-brand-green/10 space-y-4">
+            <p className="text-6xl font-black text-brand-green">{correctAnswersCount} / {totalCount}</p>
+            <p className="text-xl font-bold text-deep-forest">{scorePercent}% Mastery Score</p>
+          </div>
+
+          <div className="space-y-2 px-4">
+            <h4 className="text-2xl font-black text-deep-forest underline decoration-accent-sand decoration-2">{motivationalMessage}</h4>
+            <p className="text-deep-forest/60 italic leading-relaxed text-sm md:text-base font-cultural">
+              "{motivationalSub}"
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+            <button
+              onClick={handleRetryQuiz}
+              className="w-full bg-brand-green/10 text-brand-green font-black uppercase tracking-widest text-lg py-5 rounded-3xl border border-brand-green/20 hover:bg-brand-green/20 active:scale-95 transition-all text-center"
+            >
+              🔄 Retry Quiz
+            </button>
+            <button
+              onClick={onExit}
+              className="w-full bg-brand-green text-white font-black uppercase tracking-widest text-lg py-5 rounded-3xl shadow-xl hover:brightness-110 active:scale-95 transition-all text-center"
+            >
+              ← Back to Lessons
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
+  }
 
   const totalSteps = lesson.phrases.length * 2;
   const currentStep = mode === "learning" ? currentIndex + 1 : lesson.phrases.length + currentIndex + 1;
@@ -1408,7 +1521,7 @@ function LessonScreen({
             className="space-y-10 bg-white p-12 rounded-[4rem] border-2 border-brand-green/10 shadow-2xl card-shadow"
           >
             <div className="text-center space-y-4">
-              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Ancestral Challenge</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-accent-brown opacity-40">Ancestral Challenge Challenge</span>
               {quizType === "kto_bm" && (
                 <>
                   <h3 className="text-4xl font-black text-brand-green">What is the meaning in Malay?</h3>
@@ -1437,21 +1550,21 @@ function LessonScreen({
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {options.map((opt) => {
-                const hasMatchedCorrect = selectedOption !== null;
-                const isSelectedCorrect = hasMatchedCorrect && opt.correct;
-                const isSelectedWrong = wrongOptions.includes(opt.text);
+                const hasMatchedCorrect = isAnswered;
+                const isSelectedCorrect = isAnswered && opt.correct;
+                const isSelectedAndWrong = isAnswered && opt.text === selectedOption && !opt.correct;
 
                 return (
                   <button
                     key={opt.text}
-                    disabled={hasMatchedCorrect}
+                    disabled={isAnswered}
                     onClick={() => handleOptionClick(opt)}
                     className={cn(
                       "p-6 rounded-[2rem] border-4 text-left transition-all font-black text-xl md:text-2xl shadow-sm",
                       isSelectedCorrect
                         ? "bg-green-600 border-green-800 text-white shadow-2xl scale-[1.03] -translate-y-1"
-                        : (isSelectedWrong
-                          ? "bg-red-500 border-red-700 text-white opacity-80 scale-95 cursor-not-allowed"
+                        : (isSelectedAndWrong
+                          ? "bg-red-500 border-red-700 text-white shadow-md scale-95"
                           : "bg-brand-warm-white border-transparent hover:border-accent-sand/30 text-deep-forest hover:bg-soft-green hover:scale-[1.01]")
                     )}
                   >
@@ -1466,30 +1579,30 @@ function LessonScreen({
         {/* Navigation */}
         <div className="flex justify-between items-center pt-10">
           <button 
-            disabled={currentIndex === 0 && mode === "learning"}
+            disabled={currentIndex === 0 || mode === "quiz" || isAnswered}
             onClick={back}
             className="px-10 py-5 text-brand-green font-black uppercase tracking-widest disabled:opacity-20 disabled:pointer-events-none hover:bg-soft-green rounded-3xl transition-all active:scale-95"
           >
             ← Back
           </button>
+          
           <button 
             type="button"
             onClick={(e) => {
               e.preventDefault();
               next();
             }}
-            disabled={mode === "quiz" && selectedOption === null}
+            disabled={mode === "quiz" || isAnswered}
             className={cn(
               "px-16 py-6 rounded-full font-black text-2xl shadow-[0_20px_50px_rgba(27,67,50,0.4)] transition-all transform active:scale-90 hover:scale-105",
-              (mode === "quiz" && selectedOption === null) ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none" : "bg-deep-forest text-white hover:brightness-125"
+              mode === "quiz" ? "bg-gray-200 text-gray-400 cursor-not-allowed shadow-none" : "bg-deep-forest text-white hover:brightness-125"
             )}
           >
-            {mode === "learning" ? (currentIndex === lesson.phrases.length - 1 ? "Start Entrance Quiz →" : "Proceed →") : (currentIndex === lesson.phrases.length - 1 ? "Reclaim Heritage →" : "Next Question →")}
+            {mode === "learning" ? (currentIndex === lesson.phrases.length - 1 ? "Start Entrance Quiz →" : "Proceed →") : "Proceeding Automatically..."}
           </button>
         </div>
       </div>
 
-      
       {/* Decorative Bottom */}
       <div className="h-4 w-full woven-border opacity-50 absolute bottom-0 left-0"></div>
     </div>
@@ -1666,12 +1779,14 @@ function ProfileScreen({
   favourites, 
   onToggleFavourite,
   masteredPhraseIds = [],
+  bestScores = {},
   hasSubmittedPost = false
 }: { 
   user: any, 
   favourites: Phrase[], 
   onToggleFavourite: (phrase: Phrase) => void,
   masteredPhraseIds?: string[],
+  bestScores?: Record<string, number>,
   hasSubmittedPost?: boolean
 }) {
   const defaultUser = {
@@ -1701,13 +1816,11 @@ function ProfileScreen({
     { name: "Celebrations", id: "l11" }
   ];
 
-  // 2. Map progress calculation for each category
+  // 2. Map progress calculation for each category using bestScores
   const categoryProgressMap = categoriesList.map((cat) => {
     const matchingLesson = LESSONS.find(l => l.id === cat.id || l.title === cat.name);
     const totalPhrases = matchingLesson ? matchingLesson.phrases.length : 8;
-    const completedPhrases = matchingLesson 
-      ? matchingLesson.phrases.filter(p => masteredPhraseIds.includes(p.id)).length 
-      : 0;
+    const completedPhrases = matchingLesson ? (bestScores[matchingLesson.id] || 0) : 0;
     const percent = totalPhrases > 0 ? Math.round((completedPhrases / totalPhrases) * 100) : 0;
     return { 
       ...cat, 
@@ -1720,7 +1833,7 @@ function ProfileScreen({
 
   // 3. Derived Metrics based on true progress state
   const completedLessonsCount = categoryProgressMap.filter(c => c.isCompleted).length;
-  const wordsLearnedCount = masteredPhraseIds.length;
+  const wordsLearnedCount = Object.values(bestScores).reduce((sum, val) => sum + (val || 0), 0);
   const currentStreak = activeUser.streak || 0;
   const coloursLessonComplete = categoryProgressMap.find(c => c.name === "Colours")?.isCompleted || false;
   const allCategoriesComplete = completedLessonsCount >= 8;
